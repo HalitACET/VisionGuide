@@ -1,36 +1,43 @@
-package com.example.visionguide.presentation.ui.screens
+package com.example.visionguide.presentation.ui.screens // Kendi paket adını kullan
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview as CameraXPreview // İsim çakışmasını önlemek için alias kullandık
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.Preview // Sadece Compose'un Preview'i normal import ediliyor
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.camera.core.ImageCapture
-import com.example.visionguide.R
-import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.PermissionState
+import com.google.accompanist.permissions.PermissionStatus
+import com.google.accompanist.permissions.rememberPermissionState
+import com.example.visionguide.presentation.ui.theme.VisionGuideTheme // Kendi tema adını kullan
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateCommunity: () -> Unit = {},
@@ -38,160 +45,244 @@ fun HomeScreen(
     onNavigateTextReader: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            HomeTopAppBar(
+    val sheetState = rememberModalBottomSheetState()
+    var showMore by remember { mutableStateOf(false) }
+    val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        CameraPermissionGate(
+            permissionState = cameraPermissionState
+        ) {
+            CameraPreview(modifier = Modifier.fillMaxSize())
+        }
+
+        FloatingControlBar(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
+            onObjectDetect = onNavigateObjectDetection,
+            onTextRead = onNavigateTextReader,
+            onMoreClick = { showMore = true }
+        )
+    }
+
+    if (showMore) {
+        ModalBottomSheet(
+            onDismissRequest = { showMore = false },
+            sheetState = sheetState,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        ) {
+            MoreCategoriesSheetContent(
                 onCommunityClick = onNavigateCommunity,
-                onSettingsClick = onNavigateToSettings
+                onSettingsClick = onNavigateToSettings,
+                onCategoryClick = { /* TODO: Diğer kategori tıklama olayları */ }
             )
         }
-    ) { paddingValues ->
-        Column(
+    }
+}
+
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+private fun CameraPermissionGate(
+    permissionState: PermissionState,
+    content: @Composable () -> Unit
+) {
+    when (val status = permissionState.status) {
+        is PermissionStatus.Granted -> content()
+        is PermissionStatus.Denied -> PermissionDeniedContent(
+            rationale = status.shouldShowRationale,
+            onRequest = { permissionState.launchPermissionRequest() }
+        )
+    }
+}
+
+@Composable
+private fun PermissionDeniedContent(
+    rationale: Boolean,
+    onRequest: () -> Unit
+) {
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        val msg = if (rationale)
+            "Kamera izni gerekli. Lütfen izin verin."
+        else
+            "Kamera izni verilmedi. İzin istemek için dokunun veya Ayarlar'dan verin."
+        Text(msg)
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = onRequest,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(32.dp))
-
-            val context = LocalContext.current
-            val imageCaptureState = remember { mutableStateOf<ImageCapture?>(null) }
-
-            Box(
+                .fillMaxWidth()
+                .height(56.dp)
+        ) { Text("İzin İste") }
+        if (!rationale) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { openAppSettings(context) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp))
-            ) {
-                CameraPreview(
-                    modifier = Modifier.fillMaxSize(),
-                    onReady = { ic -> imageCaptureState.value = ic }
-                )
-
-                FloatingActionButton(
-                    onClick = {
-                        imageCaptureState.value?.takePicture(
-                            context = context,
-                            onError = { /* hata */ },
-                            onSaved = { /* kaydedildi */ }
-                        )
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp),
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Videocam,
-                        contentDescription = "Fotoğraf Çek",
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(32.dp))
-
-            ActionButtons(
-                onDetectObjects = onNavigateObjectDetection,
-                onReadText = onNavigateTextReader
-            )
+                    .height(56.dp)
+            ) { Text("Ayarları Aç") }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HomeTopAppBar(onCommunityClick: () -> Unit, onSettingsClick: () -> Unit) {
-    TopAppBar(
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "TOPLULUK",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickable(onClick = onCommunityClick)
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-            }
-        },
-        navigationIcon = {
-            IconButton(onClick = { /* Flaş tıklandı */ }) {
-                Icon(
-                    Icons.Default.Videocam,
-                    contentDescription = "Flaş",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
-        actions = {
-            IconButton(onClick = onSettingsClick) {
-                Icon(
-                    Icons.Default.Settings,
-                    contentDescription = "Ayarlar",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent
-        )
-    )
+private fun openAppSettings(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.fromParts("package", context.packageName, null)
+    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+    context.startActivity(intent)
 }
 
 @Composable
-fun ActionButtons(
-    onDetectObjects: () -> Unit,
-    onReadText: () -> Unit
+private fun FloatingControlBar(
+    modifier: Modifier = Modifier,
+    onObjectDetect: () -> Unit,
+    onTextRead: () -> Unit,
+    onMoreClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
+    Surface(
+        modifier = modifier.shadow(12.dp, RoundedCornerShape(28.dp)),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        shape = RoundedCornerShape(28.dp)
     ) {
-        ActionButton(icon = Icons.Default.Visibility, text = "NESNELERİ TANI", onClick = onDetectObjects)
-        ActionButton(icon = Icons.Default.TextFields, text = "METİN OKU", onClick = onReadText)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ControlButton(icon = Icons.Default.Visibility, label = "Nesne", onClick = onObjectDetect)
+            ControlButton(icon = Icons.Default.TextFields, label = "Metin", onClick = onTextRead)
+            ControlButton(icon = Icons.Default.MoreHoriz, label = "Diğer", onClick = onMoreClick)
+        }
     }
 }
 
 @Composable
-fun ActionButton(icon: ImageVector, text: String, onClick: () -> Unit) {
-    Button(
+private fun ControlButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+    FilledTonalButton(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
-        modifier = Modifier.size(150.dp, 120.dp)
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.height(80.dp),
+        colors = ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+        )
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                icon,
-                contentDescription = text,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(4.dp))
+            Text(label, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun HomeScreenPreview() {
-    VisionGuideTheme {
-        HomeScreen(
-            onNavigateCommunity = {},
-            onNavigateObjectDetection = {},
-            onNavigateTextReader = {},
-            onNavigateToSettings = {}
+private fun MoreCategoriesSheetContent(
+    onCommunityClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onCategoryClick: (ActionItem) -> Unit
+) {
+    val items = remember { buildMoreItems() }
+    Column(modifier = Modifier.padding(bottom = 32.dp)) {
+        Text(
+            text = "Diğer Kategoriler",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
         )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SheetButton(item = ActionItem(Icons.Default.Groups, "Topluluk"), onClick = onCommunityClick, modifier = Modifier.weight(1f))
+            SheetButton(item = ActionItem(Icons.Default.Settings, "Ayarlar"), onClick = onSettingsClick, modifier = Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(items) { item ->
+                SheetButton(item = item, onClick = { onCategoryClick(item) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun SheetButton(item: ActionItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(80.dp).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.Start)
+        ) {
+            Icon(item.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text(text = item.label, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+fun CameraPreview(
+    modifier: Modifier = Modifier,
+    scaleType: PreviewView.ScaleType = PreviewView.ScaleType.FILL_CENTER,
+    cameraSelector: CameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val previewView = remember { PreviewView(context) }
+
+    LaunchedEffect(cameraSelector) {
+        val cameraProvider = context.getCameraProvider()
+        cameraProvider.unbindAll()
+        cameraProvider.bindToLifecycle(
+            lifecycleOwner,
+            cameraSelector,
+            CameraXPreview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+        )
+    }
+    AndroidView(factory = { previewView.apply { this.scaleType = scaleType } }, modifier = modifier)
+}
+
+private suspend fun Context.getCameraProvider(): ProcessCameraProvider = suspendCoroutine { continuation ->
+    ProcessCameraProvider.getInstance(this).also { future ->
+        future.addListener({ continuation.resume(future.get()) }, ContextCompat.getMainExecutor(this))
+    }
+}
+
+private data class ActionItem(val icon: ImageVector, val label: String)
+
+private fun buildMoreItems(): List<ActionItem> = listOf(
+    ActionItem(Icons.Default.ColorLens, "Renk Tanıma"),
+    ActionItem(Icons.Default.AttachMoney, "Para Tanıma"),
+    ActionItem(Icons.Default.QrCode, "Barkod Okuma"),
+    ActionItem(Icons.Default.Face, "Yüz Tanıma")
+)
+
+@Preview
+@Composable
+private fun HomeScreenPreview() {
+    VisionGuideTheme {
+        HomeScreen()
     }
 }

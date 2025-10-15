@@ -72,4 +72,6 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
 }

@@ -1,42 +1,46 @@
 package com.example.visionguide.presentation.ui.screens
 
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 
+// Bu data class ve veriler normalde ViewModel'den gelir.
 data class ThreadPostUI(
+    val id: String,
     val author: String,
     val content: String,
+    val timeAgo: String,
     val isMainPost: Boolean = false
 )
 
+// CommunityScreen ile tutarlı, anlamlı içerik
 val mainPost = ThreadPostUI(
+    id = "p1",
     author = "Ahmet Y.",
-    content = "Merhaba arkadaşlar, yeni çıkan sesli kitap okuyucusu hakkında ne düşünüyorsunuz?",
+    content = "Merhaba arkadaşlar, OrCam MyEye dışında daha uygun fiyatlı, günlük hayatta pratik olarak kullanabileceğim nesne tanıma cihazı veya uygulama öneriniz var mı? Özellikle market alışverişinde ürünleri ayırt etmek için arıyorum.",
+    timeAgo = "1 gün önce",
     isMainPost = true
 )
 
 val replies = listOf(
-    ThreadPostUI(author = "Zeynep A.", content = "Ben denedim, oldukça başarılı buldum."),
-    ThreadPostUI(author = "Ali V.", content = "Ben denedim, 5 Ceva başarılı buldum."),
-    ThreadPostUI(author = "Ali V.", content = "Pil ömrü konusunda biraz endişelerim var.")
+    ThreadPostUI(id = "r1", author = "Elif G.", content = "Selam Ahmet, ben telefonumda 'Seeing AI' uygulamasını kullanıyorum. Tamamen ücretsiz ve barkod okuma, metin okuma, renk tanıma gibi birçok özelliği var. Market ürünleri için barkod okuyucusu çok işe yarıyor.", timeAgo = "22 saat önce"),
+    ThreadPostUI(id = "r2", author = "Mehmet B.", content = "'Seeing AI' gerçekten başarılı. Bir de 'Envision AI' var, o da çok yetenekli ama bazı özellikleri ücretli abonelik istiyor. İkisini de deneyip karşılaştırabilirsin.", timeAgo = "18 saat önce"),
+    ThreadPostUI(id = "r3", author = "Ahmet Y.", content = "Harika öneriler, çok teşekkür ederim! Seeing AI'ı hemen deneyeceğim.", timeAgo = "15 saat önce")
 )
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +48,7 @@ fun ThreadDetailScreen(onBack: () -> Unit = {}) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("TOPLULUK", fontWeight = FontWeight.Bold) },
+                title = { Text(text = "Konu Detayı", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
@@ -54,92 +58,91 @@ fun ThreadDetailScreen(onBack: () -> Unit = {}) {
                     IconButton(onClick = { /* Yenile */ }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Yenile")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { /* Cevap yazma ekranını aç */ },
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Mic, contentDescription = "Sesli Cevap Yaz")
+            }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(paddingValues),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f) // Kalan tüm alanı kapla
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                // Ana Mesaj
-                item {
-                    PostItem(post = mainPost)
-                }
-                // Cevaplar
-                items(replies) { reply ->
-                    PostItem(post = reply)
-                }
+            item {
+                Text(
+                    text = "OrCam MyEye dışında uygun fiyatlı nesne tanıma cihazı önerisi?",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
             }
-
-            // Cevap Yaz Butonu
-            Button(
-                onClick = { /* Cevap Yaz */ },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(16.dp)
-            ) {
-                Icon(Icons.Default.Mic, contentDescription = "Sesli Dikte", tint = MaterialTheme.colorScheme.onPrimary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("CEVAP YAZ (Sesli Dikte)", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+            item {
+                ModernPostItem(post = mainPost)
+            }
+            items(replies, key = { it.id }) { reply ->
+                ModernPostItem(post = reply)
             }
         }
     }
 }
 
 @Composable
-fun PostItem(post: ThreadPostUI) {
-    val cardLabel = if (post.isMainPost) "Ana Mesaj" else "Cevap"
-    val fontWeight = if (post.isMainPost) FontWeight.Bold else FontWeight.Normal
+fun ModernPostItem(post: ThreadPostUI) {
+    val backgroundColor = if (post.isMainPost) {
+        MaterialTheme.colorScheme.surfaceVariant // Ana gönderi için farklı renk
+    } else {
+        MaterialTheme.colorScheme.surface // Cevaplar için standart renk
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (post.isMainPost) 4.dp else 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = cardLabel,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            // Kart Başlığı (Avatar, İsim, Zaman)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "Yazar Avatarı",
+                        modifier = Modifier.size(32.dp).clip(CircleShape)
+                    )
+                    Text(text = post.author, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    text = post.timeAgo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            // Gönderi İçeriği
             Text(
                 text = post.content,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "- ${post.author}",
-                fontSize = 14.sp,
-                fontWeight = fontWeight,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.bodyLarge
             )
         }
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable
 fun ThreadDetailScreenPreview() {
     VisionGuideTheme {
-        ThreadDetailScreen(onBack = {})
+        ThreadDetailScreen()
     }
 }
