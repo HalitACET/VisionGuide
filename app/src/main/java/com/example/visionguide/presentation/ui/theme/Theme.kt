@@ -1,4 +1,4 @@
-package com.example.visionguide.ui.theme
+package com.example.visionguide.presentation.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme

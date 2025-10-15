@@ -1,4 +1,4 @@
-package com.example.visionguide.ui.theme
+package com.example.visionguide.presentation.ui.theme
 import androidx.compose.ui.graphics.Color
 
 val AppBlack = Color(0xFF121212)

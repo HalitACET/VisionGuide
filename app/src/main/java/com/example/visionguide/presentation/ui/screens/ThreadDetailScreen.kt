@@ -1,4 +1,5 @@
-package com.example.visionguide.ui
+package com.example.visionguide.presentation.ui.screens
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,24 +17,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.visionguide.ui.theme.VisionGuideTheme
+import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 
-data class Post(
+data class ThreadPostUI(
     val author: String,
     val content: String,
     val isMainPost: Boolean = false
 )
 
-val mainPost = Post(
+val mainPost = ThreadPostUI(
     author = "Ahmet Y.",
     content = "Merhaba arkadaşlar, yeni çıkan sesli kitap okuyucusu hakkında ne düşünüyorsunuz?",
     isMainPost = true
 )
 
 val replies = listOf(
-    Post(author = "Zeynep A.", content = "Ben denedim, oldukça başarılı buldum."),
-    Post(author = "Ali V.", content = "Ben denedim, 5 Ceva başarılı buldum."),
-    Post(author = "Ali V.", content = "Pil ömrü konusunda biraz endişelerim var.")
+    ThreadPostUI(author = "Zeynep A.", content = "Ben denedim, oldukça başarılı buldum."),
+    ThreadPostUI(author = "Ali V.", content = "Ben denedim, 5 Ceva başarılı buldum."),
+    ThreadPostUI(author = "Ali V.", content = "Pil ömrü konusunda biraz endişelerim var.")
 )
 
 
@@ -102,7 +103,7 @@ fun ThreadDetailScreen(onBack: () -> Unit = {}) {
 }
 
 @Composable
-fun PostItem(post: Post) {
+fun PostItem(post: ThreadPostUI) {
     val cardLabel = if (post.isMainPost) "Ana Mesaj" else "Cevap"
     val fontWeight = if (post.isMainPost) FontWeight.Bold else FontWeight.Normal
 

@@ -1,4 +1,4 @@
-package com.example.visionguide.ui
+package com.example.visionguide.presentation.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,12 +28,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.camera.core.ImageCapture
 import com.example.visionguide.R
-import com.example.visionguide.ui.theme.VisionGuideTheme
+import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    // --- DEĞİŞİKLİK BURADA: Parametreleri daha anlaşılır hale getirdik ---
     onNavigateCommunity: () -> Unit = {},
     onNavigateObjectDetection: () -> Unit = {},
     onNavigateTextReader: () -> Unit = {},
@@ -94,7 +92,6 @@ fun HomeScreen(
             }
             Spacer(modifier = Modifier.height(32.dp))
 
-            // --- DEĞİŞİKLİK BURADA: Artık her butona kendi fonksiyonunu veriyoruz ---
             ActionButtons(
                 onDetectObjects = onNavigateObjectDetection,
                 onReadText = onNavigateTextReader
@@ -103,7 +100,6 @@ fun HomeScreen(
     }
 }
 
-// HomeTopAppBar fonksiyonunda bir değişiklik yok.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeTopAppBar(onCommunityClick: () -> Unit, onSettingsClick: () -> Unit) {
@@ -149,7 +145,6 @@ fun HomeTopAppBar(onCommunityClick: () -> Unit, onSettingsClick: () -> Unit) {
     )
 }
 
-// ActionButtons ve ActionButton fonksiyonlarında bir değişiklik yok.
 @Composable
 fun ActionButtons(
     onDetectObjects: () -> Unit,
@@ -188,7 +183,6 @@ fun ActionButton(icon: ImageVector, text: String, onClick: () -> Unit) {
     }
 }
 
-// Preview'i de yeni yapıya göre güncelliyoruz.
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {

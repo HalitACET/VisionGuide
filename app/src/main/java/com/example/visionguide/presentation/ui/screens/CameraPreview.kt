@@ -1,4 +1,4 @@
-package com.example.visionguide.ui
+package com.example.visionguide.presentation.ui.screens
 
 import android.Manifest
 import android.content.Context

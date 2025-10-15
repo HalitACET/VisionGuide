@@ -8,10 +8,18 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.visionguide.ui.NewTopicScreen
-import com.example.visionguide.ui.*
-import com.example.visionguide.ui.theme.VisionGuideTheme
+import com.example.visionguide.presentation.ui.screens.CommunityScreen
+import com.example.visionguide.presentation.ui.screens.HomeScreen
+import com.example.visionguide.presentation.ui.screens.NewTopicScreen
+import com.example.visionguide.presentation.ui.screens.ProfileScreen
+import com.example.visionguide.presentation.ui.screens.SettingsScreen
+import com.example.visionguide.presentation.ui.screens.ThreadDetailScreen
+import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
+import dagger.hilt.android.AndroidEntryPoint
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.visionguide.presentation.viewmodel.NewTopicViewModel
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,10 +68,11 @@ private fun AppNav() {
             )
         }
         composable("newTopic") {
+            val vm: NewTopicViewModel = hiltViewModel()
             NewTopicScreen(
                 onBack = { navController.popBackStack() },
                 onSubmit = { title, content ->
-                    // TODO: Konuyu veritabanına veya API'ye gönderme işlemleri burada yapılacak.
+                    vm.submit(title, content)
                     navController.popBackStack()
                 }
             )

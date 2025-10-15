@@ -1,4 +1,4 @@
-package com.example.visionguide.ui
+package com.example.visionguide.presentation.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -12,14 +12,17 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.visionguide.ui.theme.VisionGuideTheme
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.visionguide.presentation.viewmodel.CommunityViewModel
+import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 
-// Veri Sınıfı: Her bir konuyu temsil eder
 data class ForumTopic(
     val title: String,
     val author: String,
@@ -28,13 +31,26 @@ data class ForumTopic(
     val timeAgo: String
 )
 
-// Örnek veri listesi
-val sampleTopics = listOf(
-    ForumTopic("Yeni çıkan sesli kitap okuyucusu", "Ahmet Y.", 3, "Zeynep A.", "2 saat önce"),
-    ForumTopic("En iyi ekran okuyucu hangisi?", "Ayşe K.", 8, "Mehmet B.", "5 saat önce"),
-    ForumTopic("Görme engelliler için navigasyon", "Fatma S.", 12, "Ali V.", "1 gün önce"),
-    ForumTopic("iOS vs Android erişilebilirlik", "Can T.", 21, "Elif G.", "2 gün önce")
-)
+private fun com.example.visionguide.domain.model.Post.toForumTopic(): ForumTopic {
+    val now = System.currentTimeMillis()
+    val diff = (now - createdAt).coerceAtLeast(0)
+    val minute = 60_000L
+    val hour = 60 * minute
+    val day = 24 * hour
+    val timeAgo = when {
+        diff < minute -> "az önce"
+        diff < hour -> "${diff / minute} dk önce"
+        diff < day -> "${diff / hour} sa önce"
+        else -> "${diff / day} gün önce"
+    }
+    return ForumTopic(
+        title = title,
+        author = author,
+        replyCount = replyCount,
+        lastReplyAuthor = lastReplyAuthor,
+        timeAgo = timeAgo
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +60,10 @@ fun CommunityScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToNewTopic: () -> Unit = {}
 ) {
+    val viewModel: CommunityViewModel = hiltViewModel()
+    val posts by viewModel.posts.collectAsState(initial = emptyList())
+    val topics = posts.map { it.toForumTopic() }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -86,7 +106,7 @@ fun CommunityScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(sampleTopics) { topic ->
+            items(topics) { topic ->
                 TopicListItem(
                     topic = topic,
                     modifier = Modifier.clickable { onOpenThread() }
