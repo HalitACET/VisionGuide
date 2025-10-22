@@ -18,6 +18,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // BASE_URL default (falls back to DEV if not provided)
+        buildConfigField(
+            "String",
+            "BASE_URL",
+            "\"${project.findProperty("API_BASE_URL_DEV") ?: "https://dev-api.example.com/"}\""
+        )
     }
 
     buildTypes {
@@ -26,6 +32,20 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
+            )
+            // Override BASE_URL for release
+            buildConfigField(
+                "String",
+                "BASE_URL",
+                "\"${project.findProperty("API_BASE_URL_PROD") ?: "https://api.example.com/"}\""
+            )
+        }
+        debug {
+            // Ensure debug uses DEV url
+            buildConfigField(
+                "String",
+                "BASE_URL",
+                "\"${project.findProperty("API_BASE_URL_DEV") ?: "https://dev-api.example.com/"}\""
             )
         }
     }
@@ -38,6 +58,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

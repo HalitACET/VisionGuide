@@ -1,5 +1,6 @@
 package com.example.visionguide.data.network
 
+import com.example.visionguide.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -7,7 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    private const val BASE_URL = "https://your-cloud-api-endpoint.com/"
+    private const val BASE_URL = BuildConfig.BASE_URL
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY

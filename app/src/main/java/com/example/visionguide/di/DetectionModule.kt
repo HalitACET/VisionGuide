@@ -1,6 +1,6 @@
 package com.example.visionguide.di
 
-import com.example.visionguide.data.repository.DetectionRepository
+import com.example.visionguide.domain.repository.DetectionRepository
 import com.example.visionguide.data.repository.DetectionRepositoryImpl
 import com.example.visionguide.domain.usecase.AnalyzeImageUseCase
 import com.example.visionguide.data.network.ApiClient

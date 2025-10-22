@@ -1,4 +1,4 @@
-package com.example.visionguide.analysis
+package com.example.visionguide.presentation.analysis
 
 import android.graphics.ImageFormat
 import android.graphics.Rect
@@ -7,7 +7,9 @@ import android.util.Base64
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.example.visionguide.domain.usecase.AnalyzeImageUseCase
-import com.example.visionguide.data.network.DetectionResponse
+import com.example.visionguide.domain.common.Either
+import com.example.visionguide.domain.common.AppError
+import com.example.visionguide.domain.model.DetectionResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -17,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class CloudImageAnalyzer(
     private val scope: CoroutineScope,
     private val useCase: AnalyzeImageUseCase,
-    private val onResult: (Result<DetectionResponse>) -> Unit,
+    private val onResult: (Either<AppError, DetectionResult>) -> Unit,
     private val throttleMs: Long = 2000L
 ) : ImageAnalysis.Analyzer {
 
@@ -37,7 +39,11 @@ class CloudImageAnalyzer(
         image.close()
 
         scope.launch(Dispatchers.IO) {
-            val res = if (base64 != null) useCase(base64) else Result.failure(IllegalStateException("encode"))
+            val res = if (base64 != null) {
+                useCase(base64)
+            } else {
+                Either.Left(AppError.Unknown(IllegalStateException("encode")))
+            }
             onResult(res)
             isProcessing.set(false)
         }
