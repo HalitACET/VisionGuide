@@ -14,10 +14,12 @@ import com.example.visionguide.presentation.ui.screens.NewTopicScreen
 import com.example.visionguide.presentation.ui.screens.ProfileScreen
 import com.example.visionguide.presentation.ui.screens.SettingsScreen
 import com.example.visionguide.presentation.ui.screens.ThreadDetailScreen
+import com.example.visionguide.presentation.ui.screens.ObjectDetectionScreen
 import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.visionguide.presentation.viewmodel.NewTopicViewModel
+import com.example.visionguide.presentation.viewmodel.ObjectDetectionViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -39,7 +41,7 @@ private fun AppNav() {
         composable("home") {
             HomeScreen(
                 onNavigateCommunity = { navController.navigate("community") },
-                onNavigateObjectDetection = { /* Şimdilik boş */ },
+                onNavigateObjectDetection = { navController.navigate("objectDetection") },
                 onNavigateTextReader = { /* Şimdilik boş */ },
                 onNavigateToSettings = { navController.navigate("settings") }
             )
@@ -76,6 +78,10 @@ private fun AppNav() {
                     navController.popBackStack()
                 }
             )
+        }
+        composable("objectDetection") {
+            val vm: ObjectDetectionViewModel = hiltViewModel()
+            ObjectDetectionScreen(viewModel = vm)
         }
     }
 }

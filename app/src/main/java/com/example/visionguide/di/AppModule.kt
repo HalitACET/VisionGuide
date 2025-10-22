@@ -1,4 +1,4 @@
-package com.example.visionguide.data.di
+package com.example.visionguide.di
 
 import com.example.visionguide.data.repository.InMemoryPostRepository
 import com.example.visionguide.domain.repository.PostRepository
