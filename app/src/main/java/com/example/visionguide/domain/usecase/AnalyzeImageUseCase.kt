@@ -1,4 +1,4 @@
-package com.example.visionguide.domain
+package com.example.visionguide.domain.usecase
 
 import com.example.visionguide.data.DetectionRepository
 import com.example.visionguide.network.DetectionResponse

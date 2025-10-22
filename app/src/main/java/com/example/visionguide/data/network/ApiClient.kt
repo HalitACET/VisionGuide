@@ -1,4 +1,4 @@
-package com.example.visionguide.network
+package com.example.visionguide.data.network
 
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor

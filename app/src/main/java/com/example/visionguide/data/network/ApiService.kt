@@ -1,4 +1,4 @@
-package com.example.visionguide.network
+package com.example.visionguide.data.network
 
 import retrofit2.http.Body
 import retrofit2.http.POST

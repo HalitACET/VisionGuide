@@ -1,4 +1,4 @@
-package com.example.visionguide.network
+package com.example.visionguide.data.network
 
 data class ImageUploadRequest(
     val image: String
