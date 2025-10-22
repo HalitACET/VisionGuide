@@ -1,10 +1,10 @@
 package com.example.visionguide.di
 
-import com.example.visionguide.data.DetectionRepository
-import com.example.visionguide.data.DetectionRepositoryImpl
-import com.example.visionguide.domain.AnalyzeImageUseCase
-import com.example.visionguide.network.ApiClient
-import com.example.visionguide.network.ApiService
+import com.example.visionguide.data.repository.DetectionRepository
+import com.example.visionguide.data.repository.DetectionRepositoryImpl
+import com.example.visionguide.domain.usecase.AnalyzeImageUseCase
+import com.example.visionguide.data.network.ApiClient
+import com.example.visionguide.data.network.ApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

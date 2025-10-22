@@ -1,7 +1,7 @@
 package com.example.visionguide.domain.usecase
 
-import com.example.visionguide.data.DetectionRepository
-import com.example.visionguide.network.DetectionResponse
+import com.example.visionguide.data.repository.DetectionRepository
+import com.example.visionguide.data.network.DetectionResponse
 
 class AnalyzeImageUseCase(
     private val repository: DetectionRepository

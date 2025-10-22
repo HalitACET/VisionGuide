@@ -6,8 +6,8 @@ import android.graphics.YuvImage
 import android.util.Base64
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.example.visionguide.domain.AnalyzeImageUseCase
-import com.example.visionguide.network.DetectionResponse
+import com.example.visionguide.domain.usecase.AnalyzeImageUseCase
+import com.example.visionguide.data.network.DetectionResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

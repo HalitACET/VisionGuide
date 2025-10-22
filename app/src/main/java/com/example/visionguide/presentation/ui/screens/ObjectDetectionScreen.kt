@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider.NewInstanceFactory.Companion.instance
 import com.example.visionguide.presentation.viewmodel.ObjectDetectionViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -44,16 +45,18 @@ fun ObjectDetectionScreen(
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
 
     DisposableEffect(Unit) {
-        val instance = TextToSpeech(context) { status ->
+        var engine: TextToSpeech? = null
+        engine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                instance.language = Locale.getDefault()
+                engine?.setLanguage(Locale.getDefault())
             }
         }
-        tts = instance
+        tts = engine
         onDispose {
-            instance.stop()
-            instance.shutdown()
+            engine?.stop()
+            engine?.shutdown()
             tts = null
+            engine = null
         }
     }
 

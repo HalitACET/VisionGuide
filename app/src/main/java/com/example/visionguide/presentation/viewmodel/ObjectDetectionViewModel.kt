@@ -2,8 +2,8 @@ package com.example.visionguide.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.visionguide.domain.AnalyzeImageUseCase
-import com.example.visionguide.network.DetectionResponse
+import com.example.visionguide.domain.usecase.AnalyzeImageUseCase
+import com.example.visionguide.data.network.DetectionResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
