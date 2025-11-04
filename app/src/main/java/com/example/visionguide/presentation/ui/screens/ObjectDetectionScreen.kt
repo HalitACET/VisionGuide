@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,12 +44,19 @@ fun ObjectDetectionScreen(
     val cameraPermission = rememberPermissionState(android.Manifest.permission.CAMERA)
 
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var ttsReady by remember { mutableStateOf(false) }
+    var lastSpokenLabel by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(Unit) {
         var engine: TextToSpeech? = null
         engine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                engine?.setLanguage(Locale.getDefault())
+                val result = engine?.setLanguage(Locale.US) // İngilizce label'lar için
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    // İngilizce yoksa varsayılan dili kullan
+                    engine?.setLanguage(Locale.getDefault())
+                }
+                ttsReady = true
             }
         }
         tts = engine
@@ -56,17 +64,19 @@ fun ObjectDetectionScreen(
             engine?.stop()
             engine?.shutdown()
             tts = null
+            ttsReady = false
             engine = null
         }
     }
 
-    val state = viewModel.state
+    val state = viewModel.state.collectAsState().value
 
-    LaunchedEffect(state) {
-        state.collect { s ->
-            s.lastLabel?.let { label ->
-                tts?.speak(label, TextToSpeech.QUEUE_FLUSH, null, "visionguide_tts")
-            }
+    LaunchedEffect(state.lastLabel) {
+        val label = state.lastLabel
+        // Label varsa, değişmişse ve TTS hazırsa konuş
+        if (label != null && label != lastSpokenLabel && ttsReady) {
+            tts?.speak(label, TextToSpeech.QUEUE_FLUSH, null, "visionguide_tts")
+            lastSpokenLabel = label
         }
     }
 

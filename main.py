@@ -38,7 +38,7 @@ app.add_middleware(
 
 # Global değişkenler
 detector = None
-detection_threshold = 0.3
+detection_threshold = 0.65  # 0.65'e yükseltildi - daha güvenilir ve doğru tespitler için
 
 # Pydantic modelleri
 class DetectionRequest(BaseModel):
@@ -86,6 +86,9 @@ def preprocess_image(image_data: bytes) -> np.ndarray:
         # TensorFlow tensor'a çevir
         image_tensor = tf.convert_to_tensor(image_array, dtype=tf.uint8)
         
+        # Batch dimension ekle (model 4 boyutlu tensor bekliyor: [batch, height, width, channels])
+        image_tensor = tf.expand_dims(image_tensor, 0)
+        
         return image_tensor
     except Exception as e:
         logger.error(f"Görüntü işleme hatası: {e}")
@@ -116,25 +119,65 @@ def postprocess_detections(detections: Dict[str, Any]) -> List[Detection]:
         if hasattr(classes, 'numpy'):
             classes = classes.numpy()
         
-        # Eğer boş ise, boş liste döndür
-        if len(scores) == 0:
-            return detection_results
+        # Batch dimension'ı kaldır (eğer varsa)
+        if isinstance(boxes, np.ndarray) and len(boxes.shape) > 1:
+            if boxes.shape[0] == 1:
+                boxes = boxes[0]  # (1, N, 4) -> (N, 4)
+        if isinstance(scores, np.ndarray) and len(scores.shape) > 1:
+            if scores.shape[0] == 1:
+                scores = scores[0]  # (1, N) -> (N,)
+        if isinstance(classes, np.ndarray) and len(classes.shape) > 1:
+            if classes.shape[0] == 1:
+                classes = classes[0]  # (1, N) -> (N,)
         
-        for i in range(len(scores)):
-            if scores[i] >= detection_threshold:
-                class_id = int(classes[i])
+        # Eğer boş ise, boş liste döndür
+        if isinstance(scores, np.ndarray):
+            if scores.size == 0:
+                return detection_results
+            num_detections = scores.shape[0]
+        else:
+            if len(scores) == 0:
+                return detection_results
+            num_detections = len(scores)
+        
+        # Detection'ları işle
+        for i in range(num_detections):
+            score = float(scores[i]) if isinstance(scores, np.ndarray) else float(scores[i])
+            
+            if score >= detection_threshold:
+                class_id = int(classes[i]) if isinstance(classes, np.ndarray) else int(classes[i])
                 label = get_label_name(class_id)
+                
+                # Box formatını kontrol et ve dönüştür
+                # EfficientDet genellikle [y1, x1, y2, x2] formatında döner
+                # Biz [x1, y1, x2, y2] formatını bekliyoruz
+                if isinstance(boxes, np.ndarray):
+                    box = boxes[i]
+                    if hasattr(box, 'tolist'):
+                        box_list = box.tolist()
+                    else:
+                        box_list = list(box)
+                else:
+                    box_list = list(boxes[i])
+                
+                # Box formatını [x1, y1, x2, y2] formatına çevir
+                if len(box_list) >= 4:
+                    # Eğer [y1, x1, y2, x2] formatındaysa
+                    y1, x1, y2, x2 = box_list[:4]
+                    box_list = [x1, y1, x2, y2]
                 
                 detection = Detection(
                     label=label,
-                    score=float(scores[i]),
-                    box=boxes[i].tolist() if hasattr(boxes[i], 'tolist') else list(boxes[i])
+                    score=score,
+                    box=box_list
                 )
                 detection_results.append(detection)
         
         return detection_results
     except Exception as e:
         logger.error(f"Detection işleme hatası: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         # Hata durumunda boş liste döndür
         return []
 
@@ -205,6 +248,11 @@ async def detect_objects(request: DetectionRequest):
             detection_results = []
         
         logger.info(f"{len(detection_results)} nesne tespit edildi")
+        
+        # Debug: Tespit edilen nesneleri logla
+        if detection_results:
+            for det in detection_results:
+                logger.info(f"  - {det.label}: {det.score:.2f}")
         
         return DetectionResponse(
             detections=detection_results,

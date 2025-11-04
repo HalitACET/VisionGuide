@@ -29,7 +29,27 @@ class ObjectDetectionViewModel @Inject constructor(
     fun onDetectionResult(result: Either<AppError, DetectionResult>) {
         when (result) {
             is Either.Right -> {
-                val label = result.value.detections.maxByOrNull { it.score }?.label
+                // Debug: Tüm detection'ları logla
+                if (result.value.detections.isNotEmpty()) {
+                    result.value.detections.forEach { detection ->
+                        android.util.Log.d("VisionGuide", "Detection: ${detection.label}, Score: ${detection.score}")
+                    }
+                }
+                // En yüksek score'lu detection'ı seç, ancak:
+                // 1. Score 0.6'dan yüksek olmalı
+                // 2. "unknown" label'ını filtrele
+                val filteredDetections = result.value.detections
+                    .filter { it.score > 0.6f && it.label != "unknown" }
+                
+                val bestDetection = if (filteredDetections.isNotEmpty()) {
+                    filteredDetections.maxByOrNull { it.score }
+                } else {
+                    // Eğer yüksek skorlu detection yoksa, en yüksek olanı al ama "unknown" değilse
+                    result.value.detections.filter { it.label != "unknown" }.maxByOrNull { it.score }
+                }
+                
+                val label = bestDetection?.label
+                android.util.Log.d("VisionGuide", "Selected label: $label (score: ${bestDetection?.score})")
                 _state.update { it.copy(lastLabel = label, isLoading = false, error = null) }
             }
             is Either.Left -> {

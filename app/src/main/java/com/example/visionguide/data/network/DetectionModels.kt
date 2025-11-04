@@ -11,5 +11,6 @@ data class DetectionItem(
 )
 
 data class DetectionResponse(
-    val detections: List<DetectionItem>
+    val detections: List<DetectionItem>,
+    val total_detections: Int? = null  // Backend'den gelen total_detections alanı (opsiyonel)
 )
