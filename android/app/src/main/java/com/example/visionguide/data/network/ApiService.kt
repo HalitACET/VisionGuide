@@ -17,6 +17,12 @@ interface ApiService {
     @POST("analyze")
     suspend fun analyze(@Body request: AnalyzeRequest): AnalyzeResponse
 
+    @POST("describe_scene")
+    suspend fun describeScene(@Body request: DescribeSceneRequest): DescribeSceneResponse
+
+    @POST("ask_gemini")
+    suspend fun askGemini(@Body request: AskGeminiRequest): AskGeminiResponse
+
     @GET("posts")
     suspend fun getPosts(): List<PostResponse>
 

@@ -9,4 +9,7 @@ interface DetectionRepository {
     suspend fun segment(image: String, prompt: String): Either<AppError, com.example.visionguide.domain.model.SegmentResult>
     suspend fun readText(image: String): Either<AppError, String>
     suspend fun analyze(image: String, feature: String): Either<AppError, String>
+    suspend fun analyzeCurrency(image: String): Either<AppError, String>
+    suspend fun describeScene(image: String): Either<AppError, String>
+    suspend fun askGemini(image: String, prompt: String): Either<AppError, String>
 }

@@ -66,6 +66,26 @@ class DetectionRepositoryImpl(
         val resp = api.analyze(com.example.visionguide.data.network.AnalyzeRequest(image = image, feature = feature))
         Either.Right(resp.result)
     } catch (t: Throwable) {
+        handleError(t)
+    }
+
+    override suspend fun analyzeCurrency(image: String): Either<AppError, String> = analyze(image, "currency")
+
+    override suspend fun describeScene(image: String): Either<AppError, String> = try {
+        val resp = api.describeScene(com.example.visionguide.data.network.DescribeSceneRequest(image = image))
+        Either.Right(resp.description)
+    } catch (t: Throwable) {
+        handleError(t)
+    }
+
+    override suspend fun askGemini(image: String, prompt: String): Either<AppError, String> = try {
+        val resp = api.askGemini(com.example.visionguide.data.network.AskGeminiRequest(image = image, prompt = prompt))
+        Either.Right(resp.answer)
+    } catch (t: Throwable) {
+        handleError(t)
+    }
+
+    private fun handleError(t: Throwable): Either.Left<AppError> {
         val err = when (t) {
             is SocketTimeoutException -> AppError.Timeout
             is IOException -> AppError.Network
@@ -75,6 +95,6 @@ class DetectionRepositoryImpl(
             }
             else -> AppError.Unknown(t)
         }
-        Either.Left(err)
+        return Either.Left(err)
     }
 }

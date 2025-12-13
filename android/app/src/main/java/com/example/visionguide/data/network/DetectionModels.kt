@@ -7,7 +7,9 @@ data class ImageUploadRequest(
 data class DetectionItem(
     val label: String,
     val score: Float,
-    val box: List<Float>
+    val box: List<Float>,
+    val position_desc: String? = null,
+    val proximity_desc: String? = null
 )
 
 data class DetectionResponse(
@@ -41,4 +43,21 @@ data class AnalyzeRequest(
 
 data class AnalyzeResponse(
     val result: String
+)
+
+data class DescribeSceneRequest(
+    val image: String
+)
+
+data class DescribeSceneResponse(
+    val description: String
+)
+
+data class AskGeminiRequest(
+    val image: String,
+    val prompt: String
+)
+
+data class AskGeminiResponse(
+    val answer: String
 )
