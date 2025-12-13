@@ -24,7 +24,8 @@ class ObjectDetectionViewModel @Inject constructor(
     private val analyzeImage: AnalyzeImageUseCase,
     private val segmentObjects: com.example.visionguide.domain.usecase.SegmentObjectsUseCase,
     private val readText: com.example.visionguide.domain.usecase.ReadTextUseCase,
-    private val analyze: com.example.visionguide.domain.usecase.AnalyzeUseCase
+    private val analyze: com.example.visionguide.domain.usecase.AnalyzeUseCase,
+    private val askGemini: com.example.visionguide.domain.usecase.AskGeminiUseCase
 ) : ViewModel() {
 
     // ... (existing code)
@@ -36,38 +37,14 @@ class ObjectDetectionViewModel @Inject constructor(
         
         if (command.contains("oku") || command.contains("read")) {
             // OCR Mode
-            viewModelScope.launch {
-                _state.update { it.copy(isLoading = true) }
-                // Emulator fix: Bypass frame capture and use dummy image since backend is mocked
-                // analyzerInstance?.captureNextFrame { base64 -> ... }
-                val dummyBase64 = "dummy_image_data"
-                when (val result = readText(dummyBase64)) {
-                    is Either.Right -> {
-                        _state.update { it.copy(isLoading = false, lastLabel = result.value) }
-                    }
-                    is Either.Left -> {
-                        _state.update { it.copy(isLoading = false, error = "Okuma başarısız") }
-                    }
-                }
-            }
+            captureAndReadText()
         } else if (command.contains("para") || command.contains("money") || command.contains("lira")) {
             // Currency Mode
-            analyzerInstance?.captureNextFrame { base64 ->
-                viewModelScope.launch {
-                    _state.update { it.copy(isLoading = true) }
-                    when (val result = analyze(base64, "currency")) {
-                        is Either.Right -> {
-                            _state.update { it.copy(isLoading = false, lastLabel = result.value) }
-                        }
-                        is Either.Left -> {
-                            _state.update { it.copy(isLoading = false, error = "Para tanınamadı") }
-                        }
-                    }
-                }
-            }
+            detectCurrency()
         } else if (command.contains("renk") || command.contains("color") || command.contains("boya")) {
             // Color Mode
             analyzerInstance?.captureNextFrame { base64 ->
+                if (base64 == null) return@captureNextFrame
                 viewModelScope.launch {
                     _state.update { it.copy(isLoading = true) }
                     when (val result = analyze(base64, "color")) {
@@ -85,6 +62,7 @@ class ObjectDetectionViewModel @Inject constructor(
             val objectName = command.replace("nerede", "").replace("where is", "").replace("where", "").trim()
             
             analyzerInstance?.captureNextFrame { base64 ->
+                if (base64 == null) return@captureNextFrame
                 viewModelScope.launch {
                     _state.update { it.copy(isLoading = true) }
                     when (val result = segmentObjects(base64, objectName)) {
@@ -116,9 +94,29 @@ class ObjectDetectionViewModel @Inject constructor(
                 }
             }
         } else {
-            // Segmentation Mode (Default)
-            analyzerInstance?.captureNextFrame { base64 ->
-                segment(base64, text)
+            // General Query / Description Mode (Default fallback for everything else)
+            // e.g. "betimle", "bu nedir", "describe this", "what is this", or just random text
+             analyzerInstance?.captureNextFrame { base64 ->
+                if (base64 == null) {
+                     _state.update { it.copy(isLoading = false, error = "Görüntü alınamadı") }
+                     return@captureNextFrame
+                }
+                viewModelScope.launch {
+                    _state.update { it.copy(isLoading = true) }
+                    // Pass the original text as prompt
+                    when (val result = askGemini(base64, text)) {
+                        is Either.Right -> {
+                            _state.update { it.copy(isLoading = false, lastLabel = result.value) }
+                        }
+                        is Either.Left -> {
+                             val msg = when(result.value) {
+                                  AppError.Network -> "İnternet bağlantısı yok"
+                                  else -> "Cevap alınamadı"
+                             }
+                            _state.update { it.copy(isLoading = false, error = msg) }
+                        }
+                    }
+                }
             }
         }
     }
@@ -168,8 +166,14 @@ class ObjectDetectionViewModel @Inject constructor(
                 }
                 
                 val label = bestDetection?.label
-                android.util.Log.d("VisionGuide", "Selected label: $label (score: ${bestDetection?.score})")
-                _state.update { it.copy(lastLabel = label, isLoading = false, error = null) }
+                val translatedLabel = if (label != null) {
+                    com.example.visionguide.presentation.util.TranslationHelper.translateToTurkish(label)
+                } else {
+                    null
+                }
+                
+                android.util.Log.d("VisionGuide", "Selected label: $label -> $translatedLabel (score: ${bestDetection?.score})")
+                _state.update { it.copy(lastLabel = translatedLabel, isLoading = false, error = null) }
             }
             is Either.Left -> {
                 val message = when (result.value) {
@@ -186,15 +190,67 @@ class ObjectDetectionViewModel @Inject constructor(
 
     private var analyzerInstance: com.example.visionguide.presentation.analysis.CloudImageAnalyzer? = null
 
-    fun analyzer(scopeProvider: () -> kotlinx.coroutines.CoroutineScope): com.example.visionguide.presentation.analysis.CloudImageAnalyzer {
+    fun analyzer(enableAutoAnalysis: Boolean = true): com.example.visionguide.presentation.analysis.CloudImageAnalyzer {
         if (analyzerInstance == null) {
             analyzerInstance = com.example.visionguide.presentation.analysis.CloudImageAnalyzer(
-                scope = scopeProvider(),
+                scope = viewModelScope,
                 useCase = analyzeImage,
-                onResult = { res -> onDetectionResult(res) }
+                onResult = { res -> onDetectionResult(res) },
+                enableAutoAnalysis = enableAutoAnalysis
             )
         }
         return analyzerInstance!!
     }
 
+    fun clearError() {
+        _state.update { it.copy(error = null) }
+    }
+
+    fun captureAndReadText() {
+        analyzerInstance?.captureNextFrame { base64 ->
+            viewModelScope.launch {
+                if (base64 == null) {
+                    _state.update { it.copy(isLoading = false, error = "Görüntü alınamadı (Kamera hatası)") }
+                    return@launch
+                }
+                _state.update { it.copy(isLoading = true) }
+                when (val result = readText(base64)) {
+                    is Either.Right -> {
+                        _state.update { it.copy(isLoading = false, lastLabel = result.value) }
+                    }
+                    is Either.Left -> {
+                        val message = when (result.value) {
+                            AppError.Network -> "Ağ bağlantı hatası. İnternetinizi kontrol edin."
+                            AppError.Timeout -> "Zaman aşımı. Sunucu yanıt vermiyor."
+                            AppError.Unauthorized -> "Yetkisiz erişim API Anahtarını kontrol edin."
+                            is AppError.Server -> "Sunucu hatası: ${result.value.code}. ${result.value.message}"
+                            is AppError.Unknown -> "Bilinmeyen hata: ${result.value.cause?.message}"
+                        }
+                        _state.update { it.copy(isLoading = false, error = message) }
+                    }
+                }
+            }
+        }
+    }
+    fun detectSingleObject() {
+        _state.update { it.copy(isLoading = true, lastLabel = null) } // Accessing loading state to show feedback
+        analyzerInstance?.triggerOneShotAnalysis()
+    }
+
+    fun detectCurrency() {
+        analyzerInstance?.captureNextFrame { base64 ->
+            if (base64 == null) return@captureNextFrame
+            viewModelScope.launch {
+                _state.update { it.copy(isLoading = true) }
+                when (val result = analyze(base64, "currency")) {
+                    is Either.Right -> {
+                        _state.update { it.copy(isLoading = false, lastLabel = result.value) }
+                    }
+                    is Either.Left -> {
+                        _state.update { it.copy(isLoading = false, error = "Para tanınamadı") }
+                    }
+                }
+            }
+        }
+    }
 }

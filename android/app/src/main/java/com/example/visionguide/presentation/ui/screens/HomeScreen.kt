@@ -10,6 +10,7 @@ import androidx.camera.core.Preview as CameraXPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -22,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -40,10 +42,12 @@ import kotlin.coroutines.suspendCoroutine
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
+
 fun HomeScreen(
     onNavigateCommunity: () -> Unit = {},
     onNavigateObjectDetection: () -> Unit = {},
     onNavigateTextReader: () -> Unit = {},
+    onNavigateCurrency: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -53,22 +57,48 @@ fun HomeScreen(
     val context = LocalContext.current
     val speechManager = remember { com.example.visionguide.presentation.util.SpeechRecognizerManager(context) }
     val speechState by speechManager.speechState.collectAsState()
+    
+    // TTS Manager
+    val ttsManager = remember { com.example.visionguide.presentation.util.TextToSpeechManager(context) }
+    DisposableEffect(Unit) {
+        onDispose { ttsManager.shutdown() }
+    }
 
     // Handle Voice Commands
     LaunchedEffect(speechState) {
         if (speechState is SpeechState.Result) {
             val command = (speechState as SpeechState.Result).text.lowercase()
+
             if (command.contains("nesne") || command.contains("object")) {
                 onNavigateObjectDetection()
             } else if (command.contains("topluluk") || command.contains("community")) {
                 onNavigateCommunity()
             } else if (command.contains("oku") || command.contains("read") || command.contains("metin")) {
                 onNavigateTextReader()
+            } else if (command.contains("para") || command.contains("money")) {
+                onNavigateCurrency()
             }
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val onStartListening = {
+        if (audioPermissionState.status == PermissionStatus.Granted) {
+            ttsManager.speak("Dinliyorum")
+            speechManager.startListening()
+        } else {
+            audioPermissionState.launchPermissionRequest()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = { onStartListening() }
+                )
+            }
+    ) {
         CameraPermissionGate(
             permissionState = cameraPermissionState
         ) {
@@ -77,13 +107,7 @@ fun HomeScreen(
 
         // Microphone FAB
         FloatingActionButton(
-            onClick = {
-                if (audioPermissionState.status == PermissionStatus.Granted) {
-                    speechManager.startListening()
-                } else {
-                    audioPermissionState.launchPermissionRequest()
-                }
-            },
+            onClick = onStartListening,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 120.dp, end = 16.dp), // Positioned above the bottom bar
@@ -132,7 +156,13 @@ fun HomeScreen(
             MoreCategoriesSheetContent(
                 onTextReadClick = onNavigateTextReader,
                 onSettingsClick = onNavigateToSettings,
-                onCategoryClick = { /* TODO: Diğer kategori tıklama olayları */ }
+                onCategoryClick = { item ->
+                    if (item.label == "Para Tanıma") {
+                        showMore = false
+                        onNavigateCurrency()
+                    }
+                    /* TODO: Other categories */
+                }
             )
         }
     }

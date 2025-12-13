@@ -15,10 +15,8 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     val speechRate: StateFlow<Float> = repository.speechRate
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
-
+    
     val darkMode: StateFlow<Boolean> = repository.darkMode
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun updateSpeechRate(rate: Float) {
         repository.setSpeechRate(rate)
@@ -29,7 +27,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     val isOnboardingCompleted: StateFlow<Boolean> = repository.isOnboardingCompleted
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun completeOnboarding() {
         repository.setOnboardingCompleted(true)

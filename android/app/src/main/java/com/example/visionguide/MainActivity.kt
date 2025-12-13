@@ -72,6 +72,7 @@ private fun AppNav() {
                 onNavigateCommunity = { navController.navigate("community") },
                 onNavigateObjectDetection = { navController.navigate("objectDetection") },
                 onNavigateTextReader = { navController.navigate("textReader") },
+                onNavigateCurrency = { navController.navigate("currency") },
                 onNavigateToSettings = { navController.navigate("settings") }
             )
         }
@@ -115,6 +116,13 @@ private fun AppNav() {
         composable("textReader") {
             val vm: ObjectDetectionViewModel = hiltViewModel()
             com.example.visionguide.presentation.ui.screens.TextReaderScreen(
+                viewModel = vm,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable("currency") {
+            val vm: ObjectDetectionViewModel = hiltViewModel()
+            com.example.visionguide.presentation.ui.screens.CurrencyScreen(
                 viewModel = vm,
                 onNavigateBack = { navController.popBackStack() }
             )

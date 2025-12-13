@@ -7,14 +7,25 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicNone
+import androidx.compose.material.icons.filled.TextSnippet
+
+
+
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -28,8 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -50,8 +66,14 @@ fun ObjectDetectionScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    val view = LocalView.current
 
     val cameraPermission = rememberPermissionState(android.Manifest.permission.CAMERA)
+    
+    // Initialize analyzer with auto-analysis DISABLED for manual "Tap to Detect" mode
+    // Note: We access this inside the AndroidView, but we can init it here or let the view do it. 
+    // To ensure consistency, we should force it to false in the View logic or here. 
+    // The previous logic inside AndroidView called viewModel.analyzer(). We will update that call.
 
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
@@ -61,12 +83,14 @@ fun ObjectDetectionScreen(
         var engine: TextToSpeech? = null
         engine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                val result = engine?.setLanguage(Locale.US) // İngilizce label'lar için
+                // Try Turkish first, then English, then Default
+                val result = engine?.setLanguage(Locale("tr", "TR"))
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    // İngilizce yoksa varsayılan dili kullan
-                    engine?.setLanguage(Locale.getDefault())
+                     engine?.setLanguage(Locale.US)
                 }
                 ttsReady = true
+                // Announcement on entry
+                engine?.speak("Nesne tanıma modu. Tanımak için ekrana bir kez dokunun veya sesli komut söylemek için iki kez dokunun.", TextToSpeech.QUEUE_FLUSH, null, "intro")
             }
         }
         tts = engine
@@ -83,11 +107,22 @@ fun ObjectDetectionScreen(
 
     LaunchedEffect(state.lastLabel) {
         val label = state.lastLabel
-        // Label varsa, değişmişse ve TTS hazırsa konuş
-        if (label != null && label != lastSpokenLabel && ttsReady) {
-            tts?.speak(label, TextToSpeech.QUEUE_FLUSH, null, "visionguide_tts")
-            lastSpokenLabel = label
+        // Label varsa ve değişmişse konuş. 
+        // Manual modda her click yeni bir "loading" -> "result" akışı yaratır, bu yüzden lastLabel değişmese bile 
+        // kullanıcı tekrar basarsa okumalıyız. Ancak state flow olduğu için değişim gerekir.
+        // ViewModel'de detectSingleObject çağrıldığında lastLabel = null yapıyoruz, bu yüzden her yeni sonuç değişim sayılır.
+        if (label != null && ttsReady) {
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+            tts?.speak("$label", TextToSpeech.QUEUE_FLUSH, null, "detection_result")
         }
+    }
+    
+    // Error feedback
+    LaunchedEffect(state.error) {
+         if (state.error != null && ttsReady) {
+             view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+             tts?.speak("Hata: ${state.error}", TextToSpeech.QUEUE_FLUSH, null, "error")
+         }
     }
 
     if (!cameraPermission.status.isGranted) {
@@ -112,15 +147,42 @@ fun ObjectDetectionScreen(
         }
     }
 
-    val segments = viewModel.segmentState.collectAsState().value
-    LaunchedEffect(segments) {
-        if (segments.isNotEmpty()) {
-            val label = segments.first().label
-            android.widget.Toast.makeText(context, "Bulundu: $label", android.widget.Toast.LENGTH_LONG).show()
+    // Interaction Handler
+    val onDetectTriggered = {
+        if (!state.isLoading) {
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            // Announcement for processing start
+            tts?.speak("Bakıyorum...", TextToSpeech.QUEUE_FLUSH, null, "processing")
+            viewModel.detectSingleObject()
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    val onStartListening = {
+        if (audioPermission.status.isGranted) {
+            if (ttsReady) {
+                tts?.speak("Dinliyorum", TextToSpeech.QUEUE_ADD, null, "listening")
+            }
+            speechManager.startListening()
+        } else {
+            audioPermission.launchPermissionRequest()
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .padding(0.dp)
+            // Full screen tap gesture
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onDetectTriggered() },
+                    onDoubleTap = { onStartListening() }
+                )
+            }
+            .semantics {
+                contentDescription = "Nesne Tanıma Ekranı. Ne olduğunu öğrenmek için dokunun. Sesli komut için iki kez dokunun."
+            }
+    ) {
         AndroidView(
             factory = { ctx ->
                 val previewView = androidx.camera.view.PreviewView(ctx).apply {
@@ -139,7 +201,8 @@ fun ObjectDetectionScreen(
                     }
 
                     val analysisExecutor = Executors.newSingleThreadExecutor()
-                    val analyzer = viewModel.analyzer { scope }
+                    // Initialize with auto-analysis DISABLED
+                    val analyzer = viewModel.analyzer(enableAutoAnalysis = false)
 
                     val analysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -166,18 +229,46 @@ fun ObjectDetectionScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Microphone Button
-        FloatingActionButton(
-            onClick = {
-                if (audioPermission.status.isGranted) {
-                    speechManager.startListening()
-                } else {
-                    audioPermission.launchPermissionRequest()
-                }
-            },
+        // Loading Overlay
+        if (state.isLoading) {
+             Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        
+        // Manual Trigger Button (Bottom Center) - Accessible styling
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp)
+                .background(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.8f), 
+                    RoundedCornerShape(16.dp)
+                )
+                .padding(16.dp),
+             horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+              ExtendedFloatingActionButton(
+                onClick = onDetectTriggered,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                icon = { Icon(Icons.Filled.TextSnippet, null) }, // Using generic icon as placeholder
+                text = { Text("NESNEYİ TANI", fontWeight = FontWeight.Black) },
+                modifier = Modifier.fillMaxWidth(0.8f)
+            )
+        }
+
+        // Voice Command FAB (Bottom End) - Kept but made smaller/secondary visual priority or same
+        FloatingActionButton(
+            onClick = onStartListening,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 120.dp, end = 24.dp) // Adjusted position
         ) {
             val icon = if (speechState is SpeechState.Listening) {
                 Icons.Filled.Mic
@@ -186,7 +277,7 @@ fun ObjectDetectionScreen(
             }
             Icon(
                 imageVector = icon, 
-                contentDescription = if (speechState is SpeechState.Listening) "Dinleniyor, durdurmak için dokunun" else "Konuşmak için dokunun"
+                contentDescription = if (speechState is SpeechState.Listening) "Dinleniyor..." else "Sesli Komut"
             )
         }
         
@@ -197,7 +288,7 @@ fun ObjectDetectionScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Show recognized text or status
+        // Show status text for voice commands
         if (speechState is SpeechState.Listening || speechState is SpeechState.Speaking) {
              val text = if (speechState is SpeechState.Speaking && speechState.partialText.isNotEmpty()) {
                  speechState.partialText
@@ -214,5 +305,22 @@ fun ObjectDetectionScreen(
                 color = Color.White
             )
         }
+        
+        // Result Overlay (Large Text for Low Vision)
+         if (state.lastLabel != null && !state.isLoading) {
+             Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = state.lastLabel!!,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+         }
     }
 }

@@ -7,6 +7,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,25 +27,41 @@ fun CommunityScreen(
     viewModel: CommunityViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    var showDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val ttsManager = remember { com.example.visionguide.presentation.util.TextToSpeechManager(context) }
+
+    DisposableEffect(Unit) {
+        onDispose { ttsManager.shutdown() }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Topluluk") },
+                title = { 
+                    Text(
+                        "Topluluk",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    ) 
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri Dön", modifier = Modifier.size(32.dp))
                     }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
+                onClick = onNavigateToNewTopic,
+                containerColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(80.dp) // Larger FAB
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Yeni Gönderi Ekle")
+                Icon(
+                    Icons.Default.Add, 
+                    contentDescription = "Yeni Konu Aç",
+                    modifier = Modifier.size(40.dp)
+                )
             }
         }
     ) { paddingValues ->
@@ -54,47 +72,14 @@ fun CommunityScreen(
 
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(state.posts) { post ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = post.title, 
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = post.content, 
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = post.author,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
+                    AccessiblePostCard(
+                        post = post,
+                        onClick = onOpenThread,
+                        onSpeak = { text -> ttsManager.speak(text) }
+                    )
                 }
             }
 
@@ -102,20 +87,85 @@ fun CommunityScreen(
                 Text(
                     text = state.error!!,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.Center)
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center).padding(16.dp)
                 )
             }
         }
     }
+}
 
-    if (showDialog) {
-        CreatePostDialog(
-            onDismiss = { showDialog = false },
-            onConfirm = { title, content ->
-                viewModel.createPost(title, content)
-                showDialog = false
+@Composable
+fun AccessiblePostCard(
+    post: com.example.visionguide.domain.model.Post,
+    onClick: () -> Unit,
+    onSpeak: (String) -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = post.title, 
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { onSpeak("${post.title}. ${post.content}") },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.VolumeUp, 
+                        contentDescription = "Sesli Oku",
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
-        )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Text(
+                text = post.content, 
+                style = MaterialTheme.typography.bodyLarge,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = post.author,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                )
+            }
+        }
     }
 }
 

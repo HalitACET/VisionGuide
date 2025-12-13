@@ -5,11 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,25 +25,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.visionguide.presentation.viewmodel.ObjectDetectionViewModel
-import com.example.visionguide.presentation.viewmodel.SettingsViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun TextReaderScreen(
+fun CurrencyScreen(
     viewModel: ObjectDetectionViewModel = hiltViewModel(),
-    settingsViewModel: SettingsViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit
 ) {
     val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
     val state by viewModel.state.collectAsState()
-    val speechRate by settingsViewModel.speechRate.collectAsState()
     
     val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
     val view = androidx.compose.ui.platform.LocalView.current
     
     // Analyzer initialization
@@ -57,7 +51,7 @@ fun TextReaderScreen(
     // Cleanup TTS on dispose
     DisposableEffect(Unit) {
         // Accessibility Announcement on Entry
-        ttsManager.speak("Metin okuma modu. Metni okutmak için ekrana bir kez dokunun.")
+        ttsManager.speak("Para tanıma modu. Parayı tanıtmak için ekrana bir kez dokunun.")
         onDispose {
             ttsManager.shutdown()
         }
@@ -70,7 +64,6 @@ fun TextReaderScreen(
         if (!state.lastLabel.isNullOrEmpty() && !state.isLoading) {
             showResultDialog = true
             view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
-            ttsManager.setSpeechRate(speechRate)
             ttsManager.speak(state.lastLabel!!)
         }
     }
@@ -87,30 +80,25 @@ fun TextReaderScreen(
     val onCaptureTriggered = {
         if (!state.isLoading) {
             view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-            ttsManager.speak("Okunuyor, lütfen bekleyin...")
-            viewModel.captureAndReadText()
+            ttsManager.speak("Para taranıyor, lütfen bekleyin...")
+            viewModel.detectCurrency()
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(0.dp) // Ensure full bleed
-            // Accessibility: Tap anywhere to capture
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { onCaptureTriggered() }
                 )
             }
             .semantics {
-                contentDescription = "Metin Okuma Ekranı. Fotoğraf çekmek ve okutmak için ekrana herhangi bir yere dokunun."
+                contentDescription = "Para Tanıma Ekranı. Fotoğraf çekmek için ekrana dokunun."
             }
     ) {
         if (cameraPermissionState.status == PermissionStatus.Granted) {
-            // CameraPreview removed to avoid resource conflict. 
-            // CameraPreviewWithAnalysis below handles both preview and analysis binding.
-            
-            CameraPreviewWithAnalysis(
+            CameraPreviewWithAnalysisForCurrency(
                 analyzer = analyzer,
                 modifier = Modifier.fillMaxSize()
             )
@@ -142,8 +130,7 @@ fun TextReaderScreen(
             }
         }
 
-        // Visual Controls (Still useful for low vision users)
-        // High contrast container
+        // Visual Controls
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -154,15 +141,13 @@ fun TextReaderScreen(
                 )
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Accessible Text Button
             ExtendedFloatingActionButton(
                 onClick = onCaptureTriggered,
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                icon = { Icon(Icons.Default.CameraAlt, null) },
-                text = { Text("METNİ OKU", fontWeight = FontWeight.Black) }, // Large, bold text
+                icon = { Icon(Icons.Default.AttachMoney, null) },
+                text = { Text("PARA TANI", fontWeight = FontWeight.Black) },
                 modifier = Modifier.fillMaxWidth(0.8f)
             )
         }
@@ -195,7 +180,7 @@ fun TextReaderScreen(
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
                         text = state.lastLabel!!,
-                        style = MaterialTheme.typography.headlineMedium, // Larger text style
+                        style = MaterialTheme.typography.headlineMedium,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
                         lineHeight = 36.sp
@@ -205,7 +190,7 @@ fun TextReaderScreen(
             confirmButton = {
                 Button(
                     onClick = { showResultDialog = false },
-                    modifier = Modifier.fillMaxWidth().height(56.dp) // Easier to hit
+                    modifier = Modifier.fillMaxWidth().height(56.dp)
                 ) {
                     Text("KAPAT", fontSize = 18.sp)
                 }
@@ -215,7 +200,7 @@ fun TextReaderScreen(
 }
 
 @Composable
-fun CameraPreviewWithAnalysis(
+fun CameraPreviewWithAnalysisForCurrency(
     analyzer: com.example.visionguide.presentation.analysis.CloudImageAnalyzer,
     modifier: Modifier = Modifier
 ) {

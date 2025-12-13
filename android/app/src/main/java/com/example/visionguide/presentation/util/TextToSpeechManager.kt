@@ -8,6 +8,7 @@ class TextToSpeechManager(context: Context) {
 
     private var tts: TextToSpeech? = null
     private var isInitialized = false
+    private val pendingMessages = mutableListOf<String>()
 
     init {
         tts = TextToSpeech(context) { status ->
@@ -21,6 +22,13 @@ class TextToSpeechManager(context: Context) {
                     android.util.Log.d("VisionGuideTTS", "TTS Initialized successfully")
                 }
                 isInitialized = true
+                // Play pending messages
+                if (pendingMessages.isNotEmpty()) {
+                    pendingMessages.forEach { msg ->
+                        speak(msg)
+                    }
+                    pendingMessages.clear()
+                }
             } else {
                 android.util.Log.e("VisionGuideTTS", "TTS Initialization failed")
             }
@@ -36,7 +44,8 @@ class TextToSpeechManager(context: Context) {
             android.util.Log.d("VisionGuideTTS", "Speaking: $text")
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
         } else {
-            android.util.Log.e("VisionGuideTTS", "TTS not initialized yet")
+            android.util.Log.d("VisionGuideTTS", "TTS not ready, queuing: $text")
+            pendingMessages.add(text)
         }
     }
 
