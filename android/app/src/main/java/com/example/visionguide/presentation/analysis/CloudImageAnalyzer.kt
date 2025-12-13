@@ -25,8 +25,24 @@ class CloudImageAnalyzer(
 
     private val isProcessing = AtomicBoolean(false)
     private var lastSent = 0L
+    private var onCaptureNext: ((String) -> Unit)? = null
+
+    fun captureNextFrame(callback: (String) -> Unit) {
+        onCaptureNext = callback
+    }
 
     override fun analyze(image: ImageProxy) {
+        val captureCallback = onCaptureNext
+        if (captureCallback != null) {
+            val base64 = image.toBase64()
+            image.close()
+            if (base64 != null) {
+                captureCallback(base64)
+            }
+            onCaptureNext = null
+            return
+        }
+
         val now = System.currentTimeMillis()
         if (now - lastSent < throttleMs || isProcessing.get()) {
             image.close()

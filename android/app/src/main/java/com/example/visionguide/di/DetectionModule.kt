@@ -26,4 +26,16 @@ object DetectionModule {
     @Provides
     @Singleton
     fun provideAnalyzeImageUseCase(repo: DetectionRepository): AnalyzeImageUseCase = AnalyzeImageUseCase(repo)
+
+    @Provides
+    @Singleton
+    fun provideReadTextUseCase(repo: DetectionRepository): com.example.visionguide.domain.usecase.ReadTextUseCase = com.example.visionguide.domain.usecase.ReadTextUseCase(repo)
+
+    @Provides
+    @Singleton
+    fun provideAnalyzeUseCase(repo: DetectionRepository): com.example.visionguide.domain.usecase.AnalyzeUseCase = com.example.visionguide.domain.usecase.AnalyzeUseCase(repo)
+
+    @Provides
+    @Singleton
+    fun provideSegmentObjectsUseCase(repo: DetectionRepository): com.example.visionguide.domain.usecase.SegmentObjectsUseCase = com.example.visionguide.domain.usecase.SegmentObjectsUseCase(repo)
 }

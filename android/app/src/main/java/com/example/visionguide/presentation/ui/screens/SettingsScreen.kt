@@ -21,11 +21,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.visionguide.presentation.viewmodel.SettingsViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val speechRate by viewModel.speechRate.collectAsState()
+    val darkMode by viewModel.darkMode.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -47,28 +54,51 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            SettingSwitchItem(
-                icon = Icons.Default.Notifications,
-                title = "Bildirimlere İzin Ver",
-                initialState = true
+            // Speech Rate Slider
+            Text(
+                text = "Ses Hızı: ${String.format("%.1fx", speechRate)}",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.titleMedium
             )
-            Divider(modifier = Modifier.padding(horizontal = 16.dp))
-            SettingClickableItem(
+            Slider(
+                value = speechRate,
+                onValueChange = { viewModel.updateSpeechRate(it) },
+                valueRange = 0.5f..2.0f,
+                steps = 14, // 0.1 increments roughly
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            Divider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+
+            // Dark Mode Switch
+            SettingSwitchItem(
                 icon = Icons.Default.Palette,
-                title = "Görünüm",
-                subtitle = "Koyu Tema"
-            ) {
-                // Görünüm ayarlarına git
-            }
+                title = "Koyu Tema",
+                initialState = darkMode,
+                onCheckedChange = { viewModel.updateDarkMode(it) }
+            )
+            
             Divider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Version Info
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "Versiyon 1.0.0",
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(16.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
 
 @Composable
-fun SettingSwitchItem(icon: ImageVector, title: String, initialState: Boolean) {
-    var isChecked by remember { mutableStateOf(initialState) }
-
+fun SettingSwitchItem(
+    icon: ImageVector, 
+    title: String, 
+    initialState: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -79,39 +109,12 @@ fun SettingSwitchItem(icon: ImageVector, title: String, initialState: Boolean) {
         Spacer(modifier = Modifier.width(16.dp))
         Text(title, modifier = Modifier.weight(1f), fontSize = 16.sp)
         Switch(
-            checked = isChecked,
-            onCheckedChange = { isChecked = it },
+            checked = initialState,
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = MaterialTheme.colorScheme.primary,
                 checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             )
         )
-    }
-}
-
-@Composable
-fun SettingClickableItem(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(imageVector = icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp)
-            Text(subtitle, fontSize = 14.sp, color = LocalContentColor.current.copy(alpha = 0.6f))
-        }
-        Icon(Icons.Default.ChevronRight, contentDescription = null)
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun SettingsScreenPreview() {
-    VisionGuideTheme {
-        SettingsScreen(onBack = {})
     }
 }

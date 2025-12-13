@@ -12,5 +12,33 @@ data class DetectionItem(
 
 data class DetectionResponse(
     val detections: List<DetectionItem>,
-    val total_detections: Int? = null  // Backend'den gelen total_detections alanı (opsiyonel)
+    val total_detections: Int? = null
+)
+
+data class SegmentRequest(
+    val image: String,
+    val prompt: String
+)
+
+data class SegmentItem(
+    val label: String,
+    val score: Float,
+    val mask: List<List<Int>> // Simplified mask representation for now
+)
+
+data class SegmentResponse(
+    val results: List<SegmentItem>
+)
+
+data class OcrResponse(
+    val text: String
+)
+
+data class AnalyzeRequest(
+    val image: String,
+    val feature: String
+)
+
+data class AnalyzeResponse(
+    val result: String
 )

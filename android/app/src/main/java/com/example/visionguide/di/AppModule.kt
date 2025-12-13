@@ -14,4 +14,8 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindPostRepository(impl: InMemoryPostRepository): PostRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCommunityRepository(impl: com.example.visionguide.data.repository.CommunityRepositoryImpl): com.example.visionguide.domain.repository.CommunityRepository
 }

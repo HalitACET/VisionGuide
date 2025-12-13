@@ -1,4 +1,4 @@
-package com.example.visionguide.presentation.ui.screens // Kendi paket adını kullan
+package com.example.visionguide.presentation.ui.screens
 
 import android.Manifest
 import android.content.Context
@@ -6,7 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview as CameraXPreview // İsim çakışmasını önlemek için alias kullandık
+import androidx.camera.core.Preview as CameraXPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
@@ -25,7 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview // Sadece Compose'un Preview'i normal import ediliyor
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -33,7 +33,8 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
-import com.example.visionguide.presentation.ui.theme.VisionGuideTheme // Kendi tema adını kullan
+import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
+import com.example.visionguide.presentation.util.SpeechState
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -47,7 +48,25 @@ fun HomeScreen(
 ) {
     val sheetState = rememberModalBottomSheetState()
     var showMore by remember { mutableStateOf(false) }
+    val audioPermissionState = rememberPermissionState(permission = Manifest.permission.RECORD_AUDIO)
     val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
+    val context = LocalContext.current
+    val speechManager = remember { com.example.visionguide.presentation.util.SpeechRecognizerManager(context) }
+    val speechState by speechManager.speechState.collectAsState()
+
+    // Handle Voice Commands
+    LaunchedEffect(speechState) {
+        if (speechState is SpeechState.Result) {
+            val command = (speechState as SpeechState.Result).text.lowercase()
+            if (command.contains("nesne") || command.contains("object")) {
+                onNavigateObjectDetection()
+            } else if (command.contains("topluluk") || command.contains("community")) {
+                onNavigateCommunity()
+            } else if (command.contains("oku") || command.contains("read") || command.contains("metin")) {
+                onNavigateTextReader()
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         CameraPermissionGate(
@@ -56,12 +75,50 @@ fun HomeScreen(
             CameraPreview(modifier = Modifier.fillMaxSize())
         }
 
+        // Microphone FAB
+        FloatingActionButton(
+            onClick = {
+                if (audioPermissionState.status == PermissionStatus.Granted) {
+                    speechManager.startListening()
+                } else {
+                    audioPermissionState.launchPermissionRequest()
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 120.dp, end = 16.dp), // Positioned above the bottom bar
+            containerColor = if (speechState is SpeechState.Listening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Icon(
+                imageVector = if (speechState is SpeechState.Listening) Icons.Default.Mic else Icons.Default.MicNone,
+                contentDescription = "Sesli Komut. Konuşmak için basılı tutun.",
+                tint = if (speechState is SpeechState.Listening) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+            )
+        }
+        
+        // DEBUG: Show recognized text
+        if (speechState is SpeechState.Result) {
+            Text(
+                text = "Algılanan: ${(speechState as SpeechState.Result).text}",
+                modifier = Modifier.align(Alignment.Center),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+        } else if (speechState is SpeechState.Error) {
+             Text(
+                text = "Hata: ${(speechState as SpeechState.Error).message}",
+                modifier = Modifier.align(Alignment.Center),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
         FloatingControlBar(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
             onObjectDetect = onNavigateObjectDetection,
-            onTextRead = onNavigateTextReader,
+            onCommunity = onNavigateCommunity,
             onMoreClick = { showMore = true }
         )
     }
@@ -73,7 +130,7 @@ fun HomeScreen(
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             MoreCategoriesSheetContent(
-                onCommunityClick = onNavigateCommunity,
+                onTextReadClick = onNavigateTextReader,
                 onSettingsClick = onNavigateToSettings,
                 onCategoryClick = { /* TODO: Diğer kategori tıklama olayları */ }
             )
@@ -145,7 +202,7 @@ private fun openAppSettings(context: Context) {
 private fun FloatingControlBar(
     modifier: Modifier = Modifier,
     onObjectDetect: () -> Unit,
-    onTextRead: () -> Unit,
+    onCommunity: () -> Unit,
     onMoreClick: () -> Unit
 ) {
     Surface(
@@ -161,7 +218,7 @@ private fun FloatingControlBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             ControlButton(icon = Icons.Default.Visibility, label = "Nesne", onClick = onObjectDetect)
-            ControlButton(icon = Icons.Default.TextFields, label = "Metin", onClick = onTextRead)
+            ControlButton(icon = Icons.Default.Groups, label = "Topluluk", onClick = onCommunity)
             ControlButton(icon = Icons.Default.MoreHoriz, label = "Diğer", onClick = onMoreClick)
         }
     }
@@ -190,20 +247,20 @@ private fun ControlButton(icon: ImageVector, label: String, onClick: () -> Unit)
 
 @Composable
 private fun MoreCategoriesSheetContent(
-    onCommunityClick: () -> Unit,
+    onTextReadClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onCategoryClick: (ActionItem) -> Unit
 ) {
     val items = remember { buildMoreItems() }
     Column(modifier = Modifier.padding(bottom = 32.dp)) {
         Text(
-            text = "Diğer Kategoriler",
+            text = "Diğer Özellikler",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
         )
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SheetButton(item = ActionItem(Icons.Default.Groups, "Topluluk"), onClick = onCommunityClick, modifier = Modifier.weight(1f))
+            SheetButton(item = ActionItem(Icons.Default.TextFields, "Metin Oku"), onClick = onTextReadClick, modifier = Modifier.weight(1f))
             SheetButton(item = ActionItem(Icons.Default.Settings, "Ayarlar"), onClick = onSettingsClick, modifier = Modifier.weight(1f))
         }
         Spacer(modifier = Modifier.height(16.dp))

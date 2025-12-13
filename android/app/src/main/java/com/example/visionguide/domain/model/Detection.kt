@@ -17,3 +17,13 @@ data class DetectionResult(
     val detections: List<Detection>
 )
 
+data class Segment(
+    val label: String,
+    val score: Float,
+    val mask: List<List<Int>>
+)
+
+data class SegmentResult(
+    val results: List<Segment>
+)
+

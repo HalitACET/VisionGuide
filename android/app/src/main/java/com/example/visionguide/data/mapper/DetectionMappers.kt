@@ -28,3 +28,13 @@ fun DetectionItem.toDomain(): Detection {
 fun DetectionResponse.toDomain(): DetectionResult =
     DetectionResult(detections = detections.map { it.toDomain() })
 
+fun com.example.visionguide.data.network.SegmentItem.toDomain(): com.example.visionguide.domain.model.Segment =
+    com.example.visionguide.domain.model.Segment(
+        label = label,
+        score = score,
+        mask = mask
+    )
+
+fun com.example.visionguide.data.network.SegmentResponse.toDomain(): com.example.visionguide.domain.model.SegmentResult =
+    com.example.visionguide.domain.model.SegmentResult(results = results.map { it.toDomain() })
+

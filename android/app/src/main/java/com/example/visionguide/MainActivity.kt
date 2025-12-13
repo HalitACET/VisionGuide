@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,7 +28,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            VisionGuideTheme {
+            val settingsViewModel: com.example.visionguide.presentation.viewmodel.SettingsViewModel = hiltViewModel()
+            val darkMode by settingsViewModel.darkMode.collectAsState()
+
+            VisionGuideTheme(darkTheme = darkMode) {
                 AppNav()
             }
         }
@@ -36,13 +41,37 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppNav() {
     val navController: NavHostController = rememberNavController()
+    val settingsViewModel: com.example.visionguide.presentation.viewmodel.SettingsViewModel = hiltViewModel()
+    val isOnboardingCompleted by settingsViewModel.isOnboardingCompleted.collectAsState()
+    
+    // Determine start destination based on onboarding status
+    // Note: In a real app, we might want to show a splash screen while loading this state.
+    // For now, we rely on the initial value from DataStore (which is synchronous-ish via StateFlow initial value, 
+    // but might be false initially if loading async. Since we use SharedPreferences in Repo with initial value, it should be fast).
+    // However, StateFlow in ViewModel uses 'false' as default. 
+    // To avoid flickering, we might need a better loading state. 
+    // But for this MVP, let's just use "onboarding" if false. 
+    // If the user has completed it, they might see onboarding for a split second if reading from disk is slow.
+    // A better approach is to read it in MainActivity before setContent or use a Splash screen.
+    // Let's keep it simple: If false, go to onboarding.
+    
+    val startDestination = if (isOnboardingCompleted) "home" else "onboarding"
 
-    NavHost(navController = navController, startDestination = "home") {
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("onboarding") {
+            com.example.visionguide.presentation.ui.screens.OnboardingScreen(
+                onComplete = {
+                    navController.navigate("home") {
+                        popUpTo("onboarding") { inclusive = true }
+                    }
+                }
+            )
+        }
         composable("home") {
             HomeScreen(
                 onNavigateCommunity = { navController.navigate("community") },
                 onNavigateObjectDetection = { navController.navigate("objectDetection") },
-                onNavigateTextReader = { /* Şimdilik boş */ },
+                onNavigateTextReader = { navController.navigate("textReader") },
                 onNavigateToSettings = { navController.navigate("settings") }
             )
         }
@@ -82,6 +111,13 @@ private fun AppNav() {
         composable("objectDetection") {
             val vm: ObjectDetectionViewModel = hiltViewModel()
             ObjectDetectionScreen(viewModel = vm)
+        }
+        composable("textReader") {
+            val vm: ObjectDetectionViewModel = hiltViewModel()
+            com.example.visionguide.presentation.ui.screens.TextReaderScreen(
+                viewModel = vm,
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }

@@ -22,7 +22,7 @@ android {
         buildConfigField(
             "String",
             "BASE_URL",
-            "\"${project.findProperty("API_BASE_URL_DEV") ?: "https://dev-api.example.com/"}\""
+            "\"${project.findProperty("API_BASE_URL_DEV") ?: "http://10.0.2.2:8000/"}\""
         )
     }
 
@@ -45,7 +45,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"${project.findProperty("API_BASE_URL_DEV") ?: "https://dev-api.example.com/"}\""
+                "\"${project.findProperty("API_BASE_URL_DEV") ?: "http://10.0.2.2:8000/"}\""
             )
         }
     }

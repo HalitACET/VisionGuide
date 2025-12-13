@@ -6,9 +6,15 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicNone
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -19,12 +25,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModelProvider.NewInstanceFactory.Companion.instance
+import com.example.visionguide.presentation.util.SpeechRecognizerManager
+import com.example.visionguide.presentation.util.SpeechState
 import com.example.visionguide.presentation.viewmodel.ObjectDetectionViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
@@ -86,6 +96,30 @@ fun ObjectDetectionScreen(
         return
     }
 
+    val audioPermission = rememberPermissionState(android.Manifest.permission.RECORD_AUDIO)
+    val speechManager = remember { SpeechRecognizerManager(context) }
+    val speechState = speechManager.speechState.collectAsState().value
+
+    DisposableEffect(Unit) {
+        onDispose {
+            speechManager.destroy()
+        }
+    }
+
+    LaunchedEffect(speechState) {
+        if (speechState is SpeechState.Result) {
+            viewModel.onVoiceCommand(speechState.text)
+        }
+    }
+
+    val segments = viewModel.segmentState.collectAsState().value
+    LaunchedEffect(segments) {
+        if (segments.isNotEmpty()) {
+            val label = segments.first().label
+            android.widget.Toast.makeText(context, "Bulundu: $label", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             factory = { ctx ->
@@ -131,5 +165,54 @@ fun ObjectDetectionScreen(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Microphone Button
+        FloatingActionButton(
+            onClick = {
+                if (audioPermission.status.isGranted) {
+                    speechManager.startListening()
+                } else {
+                    audioPermission.launchPermissionRequest()
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+        ) {
+            val icon = if (speechState is SpeechState.Listening) {
+                Icons.Filled.Mic
+            } else {
+                Icons.Filled.MicNone
+            }
+            Icon(
+                imageVector = icon, 
+                contentDescription = if (speechState is SpeechState.Listening) "Dinleniyor, durdurmak için dokunun" else "Konuşmak için dokunun"
+            )
+        }
+        
+        // Mask Overlay
+        val segments = viewModel.segmentState.collectAsState().value
+        com.example.visionguide.presentation.ui.components.MaskOverlay(
+            segments = segments,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Show recognized text or status
+        if (speechState is SpeechState.Listening || speechState is SpeechState.Speaking) {
+             val text = if (speechState is SpeechState.Speaking && speechState.partialText.isNotEmpty()) {
+                 speechState.partialText
+             } else {
+                 "Dinliyorum..."
+             }
+             
+             Text(
+                text = text,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(16.dp),
+                color = Color.White
+            )
+        }
     }
 }

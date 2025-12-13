@@ -2,49 +2,60 @@ package com.example.visionguide.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.visionguide.domain.model.Post
-import com.example.visionguide.domain.usecase.AddPostUseCase
-import com.example.visionguide.domain.usecase.GetPostsUseCase
+import com.example.visionguide.data.network.PostResponse
+import com.example.visionguide.domain.common.Either
+import com.example.visionguide.domain.repository.CommunityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+data class CommunityUiState(
+    val posts: List<PostResponse> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
 
 @HiltViewModel
 class CommunityViewModel @Inject constructor(
-    private val getPosts: GetPostsUseCase,
-    private val addPost: AddPostUseCase
+    private val repository: CommunityRepository
 ) : ViewModel() {
 
-    private val _posts = MutableStateFlow<List<Post>>(emptyList())
-    val posts: StateFlow<List<Post>> = _posts.asStateFlow()
+    private val _state = MutableStateFlow(CommunityUiState())
+    val state: StateFlow<CommunityUiState> = _state
 
     init {
-        observePosts()
+        loadPosts()
     }
 
-    private fun observePosts() {
+    fun loadPosts() {
         viewModelScope.launch {
-            getPosts().collectLatest { list ->
-                _posts.value = list
+            _state.update { it.copy(isLoading = true, error = null) }
+            when (val result = repository.getPosts()) {
+                is Either.Right -> {
+                    _state.update { it.copy(isLoading = false, posts = result.value) }
+                }
+                is Either.Left -> {
+                    _state.update { it.copy(isLoading = false, error = "Gönderiler yüklenemedi") }
+                }
             }
         }
     }
 
-    fun addSamplePost() {
+    fun createPost(title: String, content: String) {
         viewModelScope.launch {
-            addPost(
-                Post(
-                    title = "Örnek Başlık",
-                    author = "Sistem",
-                    replyCount = 0,
-                    lastReplyAuthor = "",
-                    createdAt = System.currentTimeMillis()
-                )
-            )
+            _state.update { it.copy(isLoading = true, error = null) }
+            when (val result = repository.createPost(title, content)) {
+                is Either.Right -> {
+                    // Reload posts to show the new one
+                    loadPosts()
+                }
+                is Either.Left -> {
+                    _state.update { it.copy(isLoading = false, error = "Gönderi oluşturulamadı") }
+                }
+            }
         }
     }
 }

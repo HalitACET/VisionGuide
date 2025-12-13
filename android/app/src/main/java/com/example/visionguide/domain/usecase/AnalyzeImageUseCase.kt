@@ -9,5 +9,5 @@ class AnalyzeImageUseCase(
     private val repository: DetectionRepository
 ) {
     suspend operator fun invoke(base64Image: String): Either<AppError, DetectionResult> =
-        repository.analyze(base64Image)
+        repository.detectObjects(base64Image)
 }
