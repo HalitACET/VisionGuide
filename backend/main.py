@@ -116,6 +116,7 @@ class DescribeSceneResponse(BaseModel):
 
 
 from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy import text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi import Depends
@@ -212,12 +213,16 @@ class UserModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    first_name = Column(String, nullable=False, default="")
+    last_name = Column(String, nullable=False, default="")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class AuthRegisterRequest(BaseModel):
     email: str
     password: str
+    first_name: str
+    last_name: str
 
 
 class AuthLoginRequest(BaseModel):
@@ -229,6 +234,8 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     email: str
+    first_name: str
+    last_name: str
 
 # Pydantic Model Updates
 class Post(BaseModel):
@@ -262,6 +269,22 @@ class CommentResponse(BaseModel):
 Base.metadata.create_all(bind=engine)
 
 
+def ensure_user_columns():
+    try:
+        if not str(DATABASE_URL).startswith("sqlite"):
+            return
+
+        with engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(users)"))]
+            if "first_name" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN first_name VARCHAR DEFAULT '' NOT NULL"))
+            if "last_name" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN last_name VARCHAR DEFAULT '' NOT NULL"))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"User table migration error: {e}")
+
+
 def create_access_token(email: str) -> str:
     from datetime import timedelta
     from datetime import datetime as _dt
@@ -278,21 +301,33 @@ def create_access_token(email: str) -> str:
 async def auth_register(request: AuthRegisterRequest, db: Session = Depends(get_db)):
     email = request.email.strip().lower()
     password = request.password
+    first_name = request.first_name.strip()
+    last_name = request.last_name.strip()
 
-    if not email or not password:
+    if not email or not password or not first_name or not last_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials")
 
     existing = db.query(UserModel).filter(UserModel.email == email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
-    user = UserModel(email=email, password_hash=pwd_context.hash(password))
+    user = UserModel(
+        email=email,
+        password_hash=pwd_context.hash(password),
+        first_name=first_name,
+        last_name=last_name
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
 
     token = create_access_token(email=email)
-    return AuthResponse(access_token=token, email=email)
+    return AuthResponse(
+        access_token=token,
+        email=email,
+        first_name=user.first_name,
+        last_name=user.last_name
+    )
 
 
 @app.post("/auth/login", response_model=AuthResponse)
@@ -308,7 +343,12 @@ async def auth_login(request: AuthLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
     token = create_access_token(email=email)
-    return AuthResponse(access_token=token, email=email)
+    return AuthResponse(
+        access_token=token,
+        email=email,
+        first_name=user.first_name,
+        last_name=user.last_name
+    )
 
 @app.post("/upload-audio")
 async def upload_audio(file: UploadFile = File(...)):
@@ -546,6 +586,7 @@ async def startup_event():
     
     # Initialize Database Data (if empty)
     try:
+        ensure_user_columns()
         db = SessionLocal()
         init_db_data(db)
         db.close()

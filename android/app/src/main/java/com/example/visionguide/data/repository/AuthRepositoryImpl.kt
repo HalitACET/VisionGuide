@@ -29,7 +29,9 @@ class AuthRepositoryImpl @Inject constructor(
     private val _session = MutableStateFlow<AuthSession?>(
         prefs.getString(KEY_LOGGED_IN_EMAIL, null)?.let { email ->
             val token = prefs.getString(KEY_ACCESS_TOKEN, null)
-            AuthSession(email = email, accessToken = token)
+            val firstName = prefs.getString(KEY_FIRST_NAME, null)
+            val lastName = prefs.getString(KEY_LAST_NAME, null)
+            AuthSession(email = email, accessToken = token, firstName = firstName, lastName = lastName)
         }
     )
     override val session: StateFlow<AuthSession?> = _session.asStateFlow()
@@ -39,21 +41,42 @@ class AuthRepositoryImpl @Inject constructor(
         prefs.edit()
             .putString(KEY_LOGGED_IN_EMAIL, resp.email)
             .putString(KEY_ACCESS_TOKEN, resp.access_token)
+            .putString(KEY_FIRST_NAME, resp.first_name)
+            .putString(KEY_LAST_NAME, resp.last_name)
             .apply()
-        val session = AuthSession(email = resp.email, accessToken = resp.access_token)
+        val session = AuthSession(
+            email = resp.email,
+            accessToken = resp.access_token,
+            firstName = resp.first_name,
+            lastName = resp.last_name
+        )
         _session.value = session
         Either.Right(session)
     } catch (t: Throwable) {
         Either.Left(mapError(t))
     }
 
-    override suspend fun register(email: String, password: String): Either<AppError, AuthSession> = try {
-        val resp = api.register(AuthRegisterRequest(email = email, password = password))
+    override suspend fun register(email: String, password: String, firstName: String, lastName: String): Either<AppError, AuthSession> = try {
+        val resp = api.register(
+            AuthRegisterRequest(
+                email = email,
+                password = password,
+                first_name = firstName,
+                last_name = lastName
+            )
+        )
         prefs.edit()
             .putString(KEY_LOGGED_IN_EMAIL, resp.email)
             .putString(KEY_ACCESS_TOKEN, resp.access_token)
+            .putString(KEY_FIRST_NAME, resp.first_name)
+            .putString(KEY_LAST_NAME, resp.last_name)
             .apply()
-        val session = AuthSession(email = resp.email, accessToken = resp.access_token)
+        val session = AuthSession(
+            email = resp.email,
+            accessToken = resp.access_token,
+            firstName = resp.first_name,
+            lastName = resp.last_name
+        )
         _session.value = session
         Either.Right(session)
     } catch (t: Throwable) {
@@ -64,6 +87,8 @@ class AuthRepositoryImpl @Inject constructor(
         prefs.edit()
             .remove(KEY_LOGGED_IN_EMAIL)
             .remove(KEY_ACCESS_TOKEN)
+            .remove(KEY_FIRST_NAME)
+            .remove(KEY_LAST_NAME)
             .apply()
         _session.value = null
     }
@@ -83,5 +108,7 @@ class AuthRepositoryImpl @Inject constructor(
     private companion object {
         private const val KEY_LOGGED_IN_EMAIL = "logged_in_email"
         private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_FIRST_NAME = "first_name"
+        private const val KEY_LAST_NAME = "last_name"
     }
 }

@@ -40,6 +40,22 @@ fun RegisterScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(
+                value = uiState.firstName,
+                onValueChange = viewModel::onFirstNameChange,
+                label = { Text("Ad") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            OutlinedTextField(
+                value = uiState.lastName,
+                onValueChange = viewModel::onLastNameChange,
+                label = { Text("Soyad") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            OutlinedTextField(
                 value = uiState.email,
                 onValueChange = viewModel::onEmailChange,
                 label = { Text("E-posta") },

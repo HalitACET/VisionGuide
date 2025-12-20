@@ -9,6 +9,6 @@ interface AuthRepository {
     val session: StateFlow<AuthSession?>
 
     suspend fun login(email: String, password: String): Either<AppError, AuthSession>
-    suspend fun register(email: String, password: String): Either<AppError, AuthSession>
+    suspend fun register(email: String, password: String, firstName: String, lastName: String): Either<AppError, AuthSession>
     fun logout()
 }

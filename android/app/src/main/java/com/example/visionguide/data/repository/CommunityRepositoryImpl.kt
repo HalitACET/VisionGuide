@@ -5,6 +5,7 @@ import com.example.visionguide.data.network.CreatePostRequest
 import com.example.visionguide.data.network.PostResponse
 import com.example.visionguide.domain.common.AppError
 import com.example.visionguide.domain.common.Either
+import com.example.visionguide.domain.repository.AuthRepository
 import com.example.visionguide.domain.repository.CommunityRepository
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -15,7 +16,8 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.asRequestBody
 
 class CommunityRepositoryImpl @Inject constructor(
-    private val api: ApiService
+    private val api: ApiService,
+    private val authRepository: AuthRepository
 ) : CommunityRepository {
 
     override suspend fun getPosts(): Either<AppError, List<PostResponse>> = try {
@@ -26,7 +28,13 @@ class CommunityRepositoryImpl @Inject constructor(
     }
 
     override suspend fun createPost(title: String, content: String, audioUrl: String?): Either<AppError, PostResponse> = try {
-        val post = api.createPost(CreatePostRequest(title, content, author = "AndroidUser", audio_url = audioUrl))
+        val session = authRepository.session.value
+        val author = listOfNotNull(session?.firstName?.trim(), session?.lastName?.trim())
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+            .ifBlank { "AndroidUser" }
+
+        val post = api.createPost(CreatePostRequest(title, content, author = author, audio_url = audioUrl))
         Either.Right(post)
     } catch (t: Throwable) {
         Either.Left(mapError(t))

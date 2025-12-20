@@ -24,6 +24,8 @@ import com.example.visionguide.data.network.CommentResponse
 import com.example.visionguide.data.network.PostResponse
 import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 import kotlinx.coroutines.launch
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.visionguide.presentation.viewmodel.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, com.google.accompanist.permissions.ExperimentalPermissionsApi::class)
 @Composable
@@ -31,6 +33,9 @@ fun ThreadDetailScreen(
     postId: Int, 
     onBack: () -> Unit = {}
 ) {
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val session by authViewModel.session.collectAsState()
+
     val scope = rememberCoroutineScope()
     var post by remember { mutableStateOf<PostResponse?>(null) }
     var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
@@ -190,7 +195,15 @@ fun ThreadDetailScreen(
             onSubmit = { 
                 scope.launch {
                     try {
-                        ApiClient.api.createComment(postId, CommentCreateRequest(content = commentText))
+                        val author = listOfNotNull(session?.firstName?.trim(), session?.lastName?.trim())
+                            .filter { it.isNotBlank() }
+                            .joinToString(" ")
+                            .ifBlank { "AndroidUser" }
+
+                        ApiClient.api.createComment(
+                            postId,
+                            CommentCreateRequest(content = commentText, author = author)
+                        )
                         // Refresh comments
                         comments = ApiClient.api.getComments(postId)
                         showCommentDialog = false

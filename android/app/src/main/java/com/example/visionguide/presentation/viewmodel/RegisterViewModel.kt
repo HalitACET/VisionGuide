@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class RegisterUiState(
+    val firstName: String = "",
+    val lastName: String = "",
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
@@ -29,6 +31,14 @@ class RegisterViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState
 
+    fun onFirstNameChange(value: String) {
+        _uiState.update { it.copy(firstName = value, error = null) }
+    }
+
+    fun onLastNameChange(value: String) {
+        _uiState.update { it.copy(lastName = value, error = null) }
+    }
+
     fun onEmailChange(value: String) {
         _uiState.update { it.copy(email = value, error = null) }
     }
@@ -42,11 +52,13 @@ class RegisterViewModel @Inject constructor(
     }
 
     fun submit() {
+        val firstName = uiState.value.firstName.trim()
+        val lastName = uiState.value.lastName.trim()
         val email = uiState.value.email.trim()
         val password = uiState.value.password
         val confirm = uiState.value.confirmPassword
 
-        if (email.isBlank() || password.isBlank() || confirm.isBlank()) {
+        if (firstName.isBlank() || lastName.isBlank() || email.isBlank() || password.isBlank() || confirm.isBlank()) {
             _uiState.update { it.copy(error = "Tüm alanlar zorunludur") }
             return
         }
@@ -57,7 +69,7 @@ class RegisterViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, isSuccess = false) }
-            val result = repository.register(email, password)
+            val result = repository.register(email, password, firstName, lastName)
             when (result) {
                 is Either.Right -> _uiState.update { it.copy(isLoading = false, isSuccess = true) }
                 is Either.Left -> {
