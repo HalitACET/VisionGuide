@@ -26,3 +26,5 @@ backend/.coverage
 backend/.env
 backend/.venv/
 .venv/
+# Env
+.env
