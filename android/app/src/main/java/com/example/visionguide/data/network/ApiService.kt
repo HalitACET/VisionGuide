@@ -5,6 +5,12 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 
 interface ApiService {
+    @POST("auth/register")
+    suspend fun register(@Body request: AuthRegisterRequest): AuthResponse
+
+    @POST("auth/login")
+    suspend fun login(@Body request: AuthLoginRequest): AuthResponse
+
     @POST("/detect")
     suspend fun detect(@Body body: ImageUploadRequest): DetectionResponse
 

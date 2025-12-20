@@ -18,6 +18,7 @@ except ImportError:
 # TensorFlow removed - we use YOLOv8 and Gemini
 
 from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -120,6 +121,9 @@ from sqlalchemy.orm import sessionmaker, Session
 from fastapi import Depends
 from dotenv import load_dotenv
 
+from jose import jwt
+from passlib.context import CryptContext
+
 load_dotenv()
 
 # Database Setup
@@ -132,6 +136,11 @@ if not DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or "dev-secret-change-me"
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES") or "10080")
 
 def get_db():
     db = SessionLocal()
@@ -197,6 +206,30 @@ class CommentModel(Base):
     
     post = relationship("PostModel", back_populates="comments")
 
+
+class UserModel(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuthRegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    email: str
+
 # Pydantic Model Updates
 class Post(BaseModel):
     id: int
@@ -227,6 +260,55 @@ class CommentResponse(BaseModel):
 
 # Create tables (will update schema if needed, but for existing tables usually requires migration. For dev, we might need to recreate or alter)
 Base.metadata.create_all(bind=engine)
+
+
+def create_access_token(email: str) -> str:
+    from datetime import timedelta
+    from datetime import datetime as _dt
+
+    expire = _dt.utcnow() + timedelta(minutes=JWT_EXPIRES_MINUTES)
+    payload = {
+        "sub": email,
+        "exp": expire,
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+
+@app.post("/auth/register", response_model=AuthResponse)
+async def auth_register(request: AuthRegisterRequest, db: Session = Depends(get_db)):
+    email = request.email.strip().lower()
+    password = request.password
+
+    if not email or not password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials")
+
+    existing = db.query(UserModel).filter(UserModel.email == email).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
+
+    user = UserModel(email=email, password_hash=pwd_context.hash(password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(email=email)
+    return AuthResponse(access_token=token, email=email)
+
+
+@app.post("/auth/login", response_model=AuthResponse)
+async def auth_login(request: AuthLoginRequest, db: Session = Depends(get_db)):
+    email = request.email.strip().lower()
+    password = request.password
+
+    if not email or not password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials")
+
+    user = db.query(UserModel).filter(UserModel.email == email).first()
+    if not user or not pwd_context.verify(password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+
+    token = create_access_token(email=email)
+    return AuthResponse(access_token=token, email=email)
 
 @app.post("/upload-audio")
 async def upload_audio(file: UploadFile = File(...)):

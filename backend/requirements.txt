@@ -12,6 +12,9 @@ google-generativeai==0.3.2
 python-dotenv
 httpx
 
+python-jose[cryptography]
+passlib[bcrypt]
+
 
 # SAM 3 (şu an mock, istersen yorumda bırakabilirsin)
 # opencv-python-headless==4.8.1.78
