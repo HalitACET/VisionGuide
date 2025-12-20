@@ -37,10 +37,11 @@ class CommunityViewModel @Inject constructor(
                 is Either.Right -> {
                     val domainPosts = result.value.map { response ->
                         com.example.visionguide.domain.model.Post(
-                            id = response.id.toString(),
+                            id = response.id,
                             title = response.title,
                             content = response.content,
-                            author = response.author
+                            author = response.author,
+                            audioUrl = response.audio_url
                         )
                     }
                     _state.update { it.copy(isLoading = false, posts = domainPosts) }
@@ -52,12 +53,28 @@ class CommunityViewModel @Inject constructor(
         }
     }
 
-    fun createPost(title: String, content: String) {
+    fun createPost(title: String, content: String, audioFile: java.io.File? = null) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            when (val result = repository.createPost(title, content)) {
+            
+            var audioUrl: String? = null
+            
+            // 1. Upload Audio if exists
+            if (audioFile != null) {
+                when (val uploadResult = repository.uploadAudio(audioFile)) {
+                    is Either.Right -> {
+                        audioUrl = uploadResult.value
+                    }
+                    is Either.Left -> {
+                        _state.update { it.copy(isLoading = false, error = "Ses yüklenemedi") }
+                        return@launch
+                    }
+                }
+            }
+            
+            // 2. Create Post
+            when (val result = repository.createPost(title, content, audioUrl)) {
                 is Either.Right -> {
-                    // Reload posts to show the new one
                     loadPosts()
                 }
                 is Either.Left -> {

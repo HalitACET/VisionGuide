@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,7 +22,7 @@ import com.example.visionguide.presentation.viewmodel.CommunityViewModel
 @Composable
 fun CommunityScreen(
     onBack: () -> Unit,
-    onOpenThread: () -> Unit,
+    onOpenThread: (Int) -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToNewTopic: () -> Unit,
     viewModel: CommunityViewModel = hiltViewModel()
@@ -29,9 +30,17 @@ fun CommunityScreen(
     val state by viewModel.state.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
     val ttsManager = remember { com.example.visionguide.presentation.util.TextToSpeechManager(context) }
+    
+    // Audio Player
+    val exoPlayer = remember { 
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build() 
+    }
 
     DisposableEffect(Unit) {
-        onDispose { ttsManager.shutdown() }
+        onDispose { 
+            ttsManager.shutdown()
+            exoPlayer.release() 
+        }
     }
 
     Scaffold(
@@ -77,8 +86,15 @@ fun CommunityScreen(
                 items(state.posts) { post ->
                     AccessiblePostCard(
                         post = post,
-                        onClick = onOpenThread,
-                        onSpeak = { text -> ttsManager.speak(text) }
+                        onClick = { onOpenThread(post.id) },
+                        onSpeak = { text -> ttsManager.speak(text) },
+                        onPlayAudio = { url ->
+                            // Play Audio
+                            val mediaItem = androidx.media3.common.MediaItem.fromUri(url)
+                            exoPlayer.setMediaItem(mediaItem)
+                            exoPlayer.prepare()
+                            exoPlayer.play()
+                        }
                     )
                 }
             }
@@ -100,7 +116,8 @@ fun CommunityScreen(
 fun AccessiblePostCard(
     post: com.example.visionguide.domain.model.Post,
     onClick: () -> Unit,
-    onSpeak: (String) -> Unit
+    onSpeak: (String) -> Unit,
+    onPlayAudio: (String) -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -117,13 +134,24 @@ fun AccessiblePostCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = post.title, 
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = post.title, 
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                    // Audio Badge
+                    if (post.audioUrl != null) {
+                         AssistChip(
+                            onClick = { onPlayAudio(post.audioUrl) },
+                            label = { Text("Ses Kaydını Oynat") },
+                            leadingIcon = { Icon(Icons.Default.PlayArrow, null) },
+                            colors = AssistChipDefaults.assistChipColors(leadingIconContentColor = MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                }
+
                 IconButton(
                     onClick = { onSpeak("${post.title}. ${post.content}") },
                     modifier = Modifier.size(48.dp)
@@ -167,46 +195,4 @@ fun AccessiblePostCard(
             }
         }
     }
-}
-
-@Composable
-fun CreatePostDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
-) {
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Yeni Gönderi") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Başlık") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    label = { Text("İçerik") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(title, content) }) {
-                Text("Paylaş")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("İptal")
-            }
-        }
-    )
 }

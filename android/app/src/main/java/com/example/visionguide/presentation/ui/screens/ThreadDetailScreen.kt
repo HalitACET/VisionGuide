@@ -8,54 +8,114 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.visionguide.data.network.ApiClient
+import com.example.visionguide.data.network.CommentCreateRequest
+import com.example.visionguide.data.network.CommentResponse
+import com.example.visionguide.data.network.PostResponse
 import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
+import kotlinx.coroutines.launch
 
-// Bu data class ve veriler normalde ViewModel'den gelir.
-data class ThreadPostUI(
-    val id: String,
-    val author: String,
-    val content: String,
-    val timeAgo: String,
-    val isMainPost: Boolean = false
-)
-
-// CommunityScreen ile tutarlı, anlamlı içerik
-val mainPost = ThreadPostUI(
-    id = "p1",
-    author = "Ahmet Y.",
-    content = "Merhaba arkadaşlar, OrCam MyEye dışında daha uygun fiyatlı, günlük hayatta pratik olarak kullanabileceğim nesne tanıma cihazı veya uygulama öneriniz var mı? Özellikle market alışverişinde ürünleri ayırt etmek için arıyorum.",
-    timeAgo = "1 gün önce",
-    isMainPost = true
-)
-
-val replies = listOf(
-    ThreadPostUI(id = "r1", author = "Elif G.", content = "Selam Ahmet, ben telefonumda 'Seeing AI' uygulamasını kullanıyorum. Tamamen ücretsiz ve barkod okuma, metin okuma, renk tanıma gibi birçok özelliği var. Market ürünleri için barkod okuyucusu çok işe yarıyor.", timeAgo = "22 saat önce"),
-    ThreadPostUI(id = "r2", author = "Mehmet B.", content = "'Seeing AI' gerçekten başarılı. Bir de 'Envision AI' var, o da çok yetenekli ama bazı özellikleri ücretli abonelik istiyor. İkisini de deneyip karşılaştırabilirsin.", timeAgo = "18 saat önce"),
-    ThreadPostUI(id = "r3", author = "Ahmet Y.", content = "Harika öneriler, çok teşekkür ederim! Seeing AI'ı hemen deneyeceğim.", timeAgo = "15 saat önce")
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, com.google.accompanist.permissions.ExperimentalPermissionsApi::class)
 @Composable
-fun ThreadDetailScreen(onBack: () -> Unit = {}) {
+fun ThreadDetailScreen(
+    postId: Int, 
+    onBack: () -> Unit = {}
+) {
+    val scope = rememberCoroutineScope()
+    var post by remember { mutableStateOf<PostResponse?>(null) }
+    var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var showCommentDialog by remember { mutableStateOf(false) }
+
+    // Voice & TTS State
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val speechManager = remember { com.example.visionguide.presentation.util.SpeechRecognizerManager(context) }
+    val speechState by speechManager.speechState.collectAsState()
+    val ttsManager = remember { com.example.visionguide.presentation.util.TextToSpeechManager(context) }
+    
+    val audioPermissionState = com.google.accompanist.permissions.rememberPermissionState(
+        permission = android.Manifest.permission.RECORD_AUDIO
+    )
+    
+    var commentText by remember { mutableStateOf("") } // Hoisted state
+
+    DisposableEffect(Unit) {
+        onDispose { 
+            speechManager.destroy()
+            ttsManager.shutdown()
+        }
+    }
+
+    // Handle Speech Results
+    LaunchedEffect(speechState) {
+        if (speechState is com.example.visionguide.presentation.util.SpeechState.Result) {
+            val text = (speechState as com.example.visionguide.presentation.util.SpeechState.Result).text
+            if (text.isNotBlank()) {
+                commentText = text
+                ttsManager.speak("Yorum anlaşıldı: $text")
+            }
+        }
+    }
+
+    val startListening = {
+        if (audioPermissionState.status == com.google.accompanist.permissions.PermissionStatus.Granted) {
+             ttsManager.speak("Yorumunuzu söyleyin")
+             speechManager.startListening()
+        } else {
+            audioPermissionState.launchPermissionRequest()
+        }
+    }
+
+    // Fetch Data
+    LaunchedEffect(postId) {
+        if (postId != 0) {
+            try {
+                isLoading = true
+                val fetchedPost = ApiClient.api.getPost(postId)
+                val fetchedComments = ApiClient.api.getComments(postId)
+                post = fetchedPost
+                comments = fetchedComments
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(text = "Konu Detayı", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Yenile */ }) {
+                    IconButton(onClick = { 
+                        // Refresh
+                         scope.launch {
+                            try {
+                                isLoading = true
+                                if (postId != 0) {
+                                    post = ApiClient.api.getPost(postId)
+                                    comments = ApiClient.api.getComments(postId)
+                                }
+                            } catch(e: Exception) { e.printStackTrace() } 
+                            finally { isLoading = false }
+                        }
+                    }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Yenile")
                     }
                 }
@@ -63,52 +123,149 @@ fun ThreadDetailScreen(onBack: () -> Unit = {}) {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* Cevap yazma ekranını aç */ },
+                onClick = { 
+                    commentText = "" // Reset text
+                    showCommentDialog = true 
+                },
                 shape = CircleShape
             ) {
-                Icon(Icons.Default.Mic, contentDescription = "Sesli Cevap Yaz")
+                Icon(Icons.Default.Add, contentDescription = "Yorum Ekle")
             }
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Text(
-                    text = "OrCam MyEye dışında uygun fiyatlı nesne tanıma cihazı önerisi?",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+        if (isLoading) {
+             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                 CircularProgressIndicator()
+             }
+        } else if (post != null) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    Text(
+                        text = post!!.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+                item {
+                    // Main Post
+                    ModernPostItem(
+                        author = post!!.author,
+                        content = post!!.content,
+                        timeAgo = "Az önce", // Date parsing omitted for brevity
+                        isMainPost = true
+                    )
+                }
+                
+                item {
+                     Text("Yorumlar (${comments.size})", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp))
+                }
+
+                items(comments) { comment ->
+                    ModernPostItem(
+                        author = comment.author,
+                        content = comment.content,
+                        timeAgo = comment.created_at.take(10), // Simple substring for date
+                        isMainPost = false
+                    )
+                }
             }
-            item {
-                ModernPostItem(post = mainPost)
-            }
-            items(replies, key = { it.id }) { reply ->
-                ModernPostItem(post = reply)
-            }
+        } else {
+             Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                 Text("Gönderi bulunamadı.")
+             }
         }
+    }
+
+    if (showCommentDialog) {
+        AddCommentDialog(
+            value = commentText,
+            onValueChange = { commentText = it },
+            onVoiceClick = startListening,
+            onDismiss = { showCommentDialog = false },
+            onSubmit = { 
+                scope.launch {
+                    try {
+                        ApiClient.api.createComment(postId, CommentCreateRequest(content = commentText))
+                        // Refresh comments
+                        comments = ApiClient.api.getComments(postId)
+                        showCommentDialog = false
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        )
     }
 }
 
 @Composable
-fun ModernPostItem(post: ThreadPostUI) {
-    val backgroundColor = if (post.isMainPost) {
-        MaterialTheme.colorScheme.surfaceVariant // Ana gönderi için farklı renk
+fun AddCommentDialog(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onVoiceClick: () -> Unit,
+    onDismiss: () -> Unit, 
+    onSubmit: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Yorum Yaz") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    label = { Text("Yorumunuz") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onVoiceClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Icon(Icons.Default.Mic, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Sesle Yaz")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onSubmit,
+                enabled = value.isNotBlank()
+            ) {
+                Text("Gönder")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("İptal")
+            }
+        }
+    )
+}
+
+@Composable
+fun ModernPostItem(author: String, content: String, timeAgo: String, isMainPost: Boolean) {
+    val backgroundColor = if (isMainPost) {
+        MaterialTheme.colorScheme.surfaceVariant
     } else {
-        MaterialTheme.colorScheme.surface // Cevaplar için standart renk
+        MaterialTheme.colorScheme.surface
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (post.isMainPost) 4.dp else 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isMainPost) 4.dp else 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Kart Başlığı (Avatar, İsim, Zaman)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -120,29 +277,19 @@ fun ModernPostItem(post: ThreadPostUI) {
                         contentDescription = "Yazar Avatarı",
                         modifier = Modifier.size(32.dp).clip(CircleShape)
                     )
-                    Text(text = post.author, fontWeight = FontWeight.Bold)
+                    Text(text = author, fontWeight = FontWeight.Bold)
                 }
                 Text(
-                    text = post.timeAgo,
+                    text = timeAgo,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            // Gönderi İçeriği
             Text(
-                text = post.content,
+                text = content,
                 style = MaterialTheme.typography.bodyLarge
             )
         }
-    }
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun ThreadDetailScreenPreview() {
-    VisionGuideTheme {
-        ThreadDetailScreen()
     }
 }

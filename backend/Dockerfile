@@ -1,25 +1,25 @@
-FROM python:3.10-bullseye
+# Python 3.11 tabanlı resmi imajı kullan
+FROM python:3.11-slim
 
+# Çalışma dizinini ayarla
 WORKDIR /app
 
-# Install system dependencies
+# Sistem bağımlılıklarını yükle (ffmpeg ses işleme için gerekli olabilir)
 RUN apt-get update && apt-get install -y \
-    git \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Gereksinimleri kopyala ve yükle
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-# Note: We install CPU version of torch to keep image size smaller for App Runner
-# If GPU is needed later, we will change the index-url
-RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
-
-# Copy application code
+# Tüm kodları kopyala
 COPY . .
 
-# Expose port
+# Portu dışarı aç
 EXPOSE 8000
 
-# Command to run the application
+# Uygulamayı başlat
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -22,7 +22,7 @@ android {
         buildConfigField(
             "String",
             "BASE_URL",
-            "\"${project.findProperty("API_BASE_URL_DEV") ?: "http://10.0.2.2:8000/"}\""
+            "\"${project.findProperty("API_BASE_URL_DEV") ?: "http://127.0.0.1:8000/"}\""
         )
     }
 
@@ -37,7 +37,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"${project.findProperty("API_BASE_URL_PROD") ?: "https://api.example.com/"}\""
+                "\"https://prjpqpr65e.eu-central-1.awsapprunner.com/\""
             )
         }
         debug {
@@ -45,7 +45,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"${project.findProperty("API_BASE_URL_DEV") ?: "http://10.0.2.2:8000/"}\""
+                "\"https://prjpqpr65e.eu-central-1.awsapprunner.com/\""
             )
         }
     }
@@ -105,4 +105,9 @@ dependencies {
 
     // Coroutines for Android
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Media3 (ExoPlayer)
+    implementation("androidx.media3:media3-exoplayer:1.2.0")
+    implementation("androidx.media3:media3-ui:1.2.0")
+    implementation("androidx.media3:media3-common:1.2.0")
 }

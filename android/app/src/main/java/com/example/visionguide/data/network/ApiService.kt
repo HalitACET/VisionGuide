@@ -28,4 +28,17 @@ interface ApiService {
 
     @POST("posts")
     suspend fun createPost(@Body request: CreatePostRequest): PostResponse
+
+    @GET("posts/{postId}")
+    suspend fun getPost(@retrofit2.http.Path("postId") postId: Int): PostResponse
+
+    @GET("posts/{postId}/comments")
+    suspend fun getComments(@retrofit2.http.Path("postId") postId: Int): List<CommentResponse>
+
+    @POST("posts/{postId}/comments")
+    suspend fun createComment(@retrofit2.http.Path("postId") postId: Int, @Body request: CommentCreateRequest): CommentResponse
+
+    @retrofit2.http.Multipart
+    @POST("upload-audio")
+    suspend fun uploadAudio(@retrofit2.http.Part file: okhttp3.MultipartBody.Part): AudioUploadResponse
 }

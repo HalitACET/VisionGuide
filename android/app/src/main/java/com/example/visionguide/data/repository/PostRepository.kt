@@ -15,9 +15,9 @@ class InMemoryPostRepository @Inject constructor() : PostRepository {
     override fun getPosts(): Flow<List<Post>> = state.asStateFlow()
 
     override suspend fun addPost(post: Post) {
-        val newPost = if (post.id.isBlank()) post.copy(id = generateId(), createdAt = System.currentTimeMillis()) else post
+        val newPost = if (post.id == 0) post.copy(id = generateId(), createdAt = System.currentTimeMillis()) else post
         state.value = listOf(newPost) + state.value
     }
 
-    private fun generateId(): String = System.currentTimeMillis().toString()
+    private fun generateId(): Int = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
 }

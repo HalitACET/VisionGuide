@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -22,7 +23,7 @@ import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 @Composable
 fun NewTopicScreen(
     onBack: () -> Unit,
-    onSubmit: (title: String, content: String) -> Unit
+    onSubmit: (title: String, content: String, audioFile: java.io.File?) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
@@ -162,14 +163,60 @@ fun NewTopicScreen(
                 }
             }
 
+            // AUDIO RECORD SECTION
+            var audioFile by remember { mutableStateOf<java.io.File?>(null) }
+            var isRecording by remember { mutableStateOf(false) }
+            
+            // Reusing existing context
+            // AudioRecorderManager needs context. We have 'context' variable defined at top of function.
+            val audioRecorder = remember { com.example.visionguide.presentation.util.AudioRecorderManager(context) }
+            
+            val toggleRecording = {
+                if (audioPermissionState.status == com.google.accompanist.permissions.PermissionStatus.Granted) {
+                    if (isRecording) {
+                        audioFile = audioRecorder.stopRecording()
+                        isRecording = false
+                        ttsManager.speak("Ses kaydı tamamlandı.")
+                    } else {
+                        audioRecorder.startRecording()
+                        isRecording = true
+                        ttsManager.speak("Ses kaydediliyor... Durdurmak için tekrar basın.")
+                    }
+                } else {
+                    audioPermissionState.launchPermissionRequest()
+                }
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = if (isRecording) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(if (audioFile != null) "Ses Kaydı Eklendi" else "Ses Kaydı Ekle (İsteğe Bağlı)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = toggleRecording,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Icon(if (isRecording) androidx.compose.material.icons.Icons.Default.Stop else androidx.compose.material.icons.Icons.Default.Mic, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (isRecording) "Kaydı Durdur" else if (audioFile != null) "Yeniden Kaydet" else "Ses Kaydet")
+                    }
+                }
+            }
+
             // SUBMIT BUTTON
             Button(
-                onClick = { onSubmit(title, content) },
+                onClick = { onSubmit(title, content, audioFile) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                enabled = title.isNotBlank() && content.isNotBlank(),
+                enabled = title.isNotBlank() && (content.isNotBlank() || audioFile != null),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text("GÖNDER", fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -182,6 +229,6 @@ fun NewTopicScreen(
 @Composable
 fun NewTopicScreenPreview() {
     VisionGuideTheme {
-        NewTopicScreen(onBack = {}, onSubmit = { _, _ -> })
+        NewTopicScreen(onBack = {}, onSubmit = { _, _, _ -> })
     }
 }

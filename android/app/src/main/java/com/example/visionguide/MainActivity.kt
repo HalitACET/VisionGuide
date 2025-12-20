@@ -79,13 +79,18 @@ private fun AppNav() {
         composable("community") {
             CommunityScreen(
                 onBack = { navController.popBackStack() },
-                onOpenThread = { navController.navigate("threadDetail") },
+                onOpenThread = { postId -> navController.navigate("threadDetail/$postId") },
                 onNavigateToProfile = { navController.navigate("profile") },
                 onNavigateToNewTopic = { navController.navigate("newTopic") }
             )
         }
-        composable("threadDetail") {
+        composable(
+            route = "threadDetail/{postId}",
+            arguments = listOf(androidx.navigation.navArgument("postId") { type = androidx.navigation.NavType.IntType })
+        ) { backStackEntry ->
+            val postId = backStackEntry.arguments?.getInt("postId") ?: 0
             ThreadDetailScreen(
+                postId = postId,
                 onBack = { navController.popBackStack() }
             )
         }
@@ -101,11 +106,19 @@ private fun AppNav() {
         }
         composable("newTopic") {
             val vm: NewTopicViewModel = hiltViewModel()
+            val submissionStatus by vm.submissionStatus.collectAsState()
+            
+            androidx.compose.runtime.LaunchedEffect(submissionStatus) {
+                if (submissionStatus == true) {
+                    navController.popBackStack()
+                    vm.resetStatus()
+                }
+            }
+            
             NewTopicScreen(
                 onBack = { navController.popBackStack() },
-                onSubmit = { title, content ->
-                    vm.submit(title, content)
-                    navController.popBackStack()
+                onSubmit = { title, content, audioFile ->
+                    vm.submit(title, content, audioFile)
                 }
             )
         }
