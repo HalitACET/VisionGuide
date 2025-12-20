@@ -22,13 +22,16 @@ import androidx.compose.ui.unit.sp
 import com.example.visionguide.presentation.ui.theme.VisionGuideTheme
 
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.visionguide.presentation.viewmodel.AuthViewModel
 import com.example.visionguide.presentation.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    onLogoutSuccess: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val speechRate by viewModel.speechRate.collectAsState()
     val darkMode by viewModel.darkMode.collectAsState()
@@ -81,6 +84,22 @@ fun SettingsScreen(
 
             // Version Info
             Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    authViewModel.logout()
+                    onLogoutSuccess()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Çıkış Yap", color = MaterialTheme.colorScheme.onError)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Versiyon 1.0.0",
                 modifier = Modifier
