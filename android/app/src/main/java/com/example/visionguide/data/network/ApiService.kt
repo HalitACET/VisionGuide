@@ -12,7 +12,7 @@ interface ApiService {
     suspend fun login(@Body request: AuthLoginRequest): AuthResponse
 
     @POST("/detect")
-    suspend fun detect(@Body body: ImageUploadRequest): DetectionResponse
+    suspend fun detect(@Body body: DetectionRequest): DetectionResponse
 
     @POST("segment")
     suspend fun segment(@Body request: SegmentRequest): SegmentResponse

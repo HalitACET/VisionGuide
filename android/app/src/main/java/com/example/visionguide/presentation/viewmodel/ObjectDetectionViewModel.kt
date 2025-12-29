@@ -16,7 +16,9 @@ import kotlinx.coroutines.launch
 data class DetectionUiState(
     val lastLabel: String? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val mode: String = "E",
+    val modeName: String = "Ev Modu"
 )
 
 @HiltViewModel
@@ -29,6 +31,12 @@ class ObjectDetectionViewModel @Inject constructor(
 ) : ViewModel() {
 
     // ... (existing code)
+    // ... (existing code)
+
+    fun setMode(mode: String) {
+        _state.update { it.copy(mode = mode) }
+        analyzerInstance?.currentMode = mode
+    }
 
     fun onVoiceCommand(text: String) {
         android.util.Log.d("VisionGuide", "Voice Command: $text")
@@ -173,7 +181,15 @@ class ObjectDetectionViewModel @Inject constructor(
                 }
                 
                 android.util.Log.d("VisionGuide", "Selected label: $label -> $translatedLabel (score: ${bestDetection?.score})")
-                _state.update { it.copy(lastLabel = translatedLabel, isLoading = false, error = null) }
+                _state.update { 
+                    it.copy(
+                        lastLabel = translatedLabel, 
+                        isLoading = false, 
+                        error = null,
+                        mode = result.value.mode,
+                        modeName = result.value.modeName 
+                    ) 
+                }
             }
             is Either.Left -> {
                 val message = when (result.value) {

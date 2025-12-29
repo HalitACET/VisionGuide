@@ -32,6 +32,8 @@ class CloudImageAnalyzer(
         onCaptureNext = callback
     }
 
+    var currentMode: String = "E"
+
     private val isAnalysisTriggered = AtomicBoolean(false)
 
     fun triggerOneShotAnalysis() {
@@ -82,7 +84,7 @@ class CloudImageAnalyzer(
 
         scope.launch(Dispatchers.IO) {
             val res = if (base64 != null) {
-                useCase(base64)
+                useCase(base64, currentMode)
             } else {
                 Either.Left(AppError.Unknown(IllegalStateException("encode")))
             }

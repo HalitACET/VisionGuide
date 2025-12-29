@@ -4,18 +4,36 @@ data class ImageUploadRequest(
     val image: String
 )
 
-data class DetectionItem(
-    val label: String,
-    val score: Float,
-    val box: List<Float>,
-    val position_desc: String? = null,
-    val proximity_desc: String? = null
+data class DetectionRequest(
+    val image: String,
+    val mode: String = "E"
 )
 
 data class DetectionResponse(
+    val success: Boolean,
+    val mode: String,
+    val mode_name: String,
     val detections: List<DetectionItem>,
-    val total_detections: Int? = null
+    val image_width: Int,
+    val image_height: Int,
+    val processing_time_ms: Double
 )
+
+data class DetectionItem(
+    val label: String,
+    val label_en: String,
+    val score: Float,
+    val box: BoundingBox,
+    val box_pixels: BoundingBox
+)
+
+data class BoundingBox(
+    val x1: Float,
+    val y1: Float,
+    val x2: Float,
+    val y2: Float
+)
+
 
 data class SegmentRequest(
     val image: String,

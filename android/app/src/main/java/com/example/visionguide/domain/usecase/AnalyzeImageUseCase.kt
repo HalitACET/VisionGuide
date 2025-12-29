@@ -8,6 +8,6 @@ import com.example.visionguide.domain.model.DetectionResult
 class AnalyzeImageUseCase(
     private val repository: DetectionRepository
 ) {
-    suspend operator fun invoke(base64Image: String): Either<AppError, DetectionResult> =
-        repository.detectObjects(base64Image)
+    suspend operator fun invoke(base64Image: String, mode: String = "E"): Either<AppError, DetectionResult> =
+        repository.detectObjects(base64Image, mode)
 }

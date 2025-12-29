@@ -8,6 +8,7 @@ import os
 import io
 import logging
 from typing import List, Dict, Any, Optional
+import time
 import numpy as np
 from PIL import Image
 try:
@@ -17,7 +18,7 @@ except ImportError:
 
 # TensorFlow removed - we use YOLOv8 and Gemini
 
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Header
 from fastapi import status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -26,6 +27,7 @@ from datetime import datetime
 from typing import List, Optional, Any, Dict
 from labels import get_label_name
 from yolo_engine import yolo_engine
+from vocabulary import MODES
 
 from gemini_engine import GeminiEngine
 
@@ -61,24 +63,33 @@ detection_threshold = 0.65  # 0.65'e yükseltildi - daha güvenilir ve doğru te
 # Pydantic modelleri
 class DetectionRequest(BaseModel):
     image: str  # Base64 encoded image
+    mode: str = "E" # Default Ev Modu
 
-class Detection(BaseModel):
+class BoundingBox(BaseModel):
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+
+class DetectionResult(BaseModel):
     label: str
+    label_en: str
     score: float
-    box: List[float]  # [x1, y1, x2, y2] normalized coordinates
-    position_desc: str = "Bilinmiyor"
-    proximity_desc: str = "Bilinmiyor"
-
+    box: BoundingBox
+    box_pixels: BoundingBox
+    
 class DetectionResponse(BaseModel):
-    detections: List[Detection]
-    total_detections: int
+    success: bool
+    mode: str
+    mode_name: str
+    detections: List[DetectionResult]
+    image_width: int
+    image_height: int
+    processing_time_ms: float
 
 class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
-
-
-
 
 class ImageUploadRequest(BaseModel):
     image: str
@@ -96,9 +107,6 @@ class AnalyzeRequest(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     result: str
-
-
-
 
 class AskGeminiRequest(BaseModel):
     image: str
@@ -491,8 +499,6 @@ async def analyze_image(request: AnalyzeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-
 @app.post("/ocr", response_model=OcrResponse)
 async def read_text(request: ImageUploadRequest):
     """Gerçek OCR endpoint'i.
@@ -633,50 +639,60 @@ async def segment_objects(request: SegmentRequest):
 
 @app.post("/detect", response_model=DetectionResponse)
 async def detect_objects(request: DetectionRequest):
-    """YOLOv8 ile nesne tespiti yapar."""
+    """YOLOv8 ile nesne tespiti yapar (Updated)."""
+    start_time = time.time()
     try:
         image_bytes = base64.b64decode(request.image)
+        # Görüntü boyutu bilgisi için
+        pil_img = Image.open(io.BytesIO(image_bytes))
+        width, height = pil_img.size
+        # Pointer reset
+        pil_img.seek(0)
     except Exception:
         raise HTTPException(status_code=400, detail="Geçersiz base64 görüntü")
 
-    detections_raw = yolo_engine.predict(image_bytes)
-    detections = []
+    # Mod varsayılanını kontrol et
+    mode = request.mode if request.mode in MODES else "E"
+
+    detections_raw = yolo_engine.predict(image_bytes, mode=mode)
+    
+    detections: List[DetectionResult] = []
+    
     for d in detections_raw:
         box = d["bbox"] # [x1, y1, x2, y2]
-        
-        # Spatial Context Logic
         x1, y1, x2, y2 = box
-        center_x = (x1 + x2) / 2
-        area = (x2 - x1) * (y2 - y1)
         
-        # Position Description
-        if center_x < 0.33:
-            pos_desc = "Sol"
-        elif center_x > 0.66:
-            pos_desc = "Sağ"
-        else:
-            pos_desc = "Orta"
-            
-        # Proximity Description (Area based estimation)
-        # These thresholds might need tuning based on camera FOV
-        if area > 0.15:
-            prox_desc = "Yakın"
-        elif area < 0.05:
-            prox_desc = "Uzak"
-        else:
-            prox_desc = "Orta Mesafe"
+        # Normailze edilmiş ve piksel cinsinden kutuları hazırla
+        
+        # Normalize (0-1)
+        x1_norm = max(0.0, min(1.0, x1 / width)) if width > 0 else 0
+        y1_norm = max(0.0, min(1.0, y1 / height)) if height > 0 else 0
+        x2_norm = max(0.0, min(1.0, x2 / width)) if width > 0 else 0
+        y2_norm = max(0.0, min(1.0, y2 / height)) if height > 0 else 0
 
         detections.append(
-            Detection(
-                label=d["label"], 
-                score=float(d["score"]), 
-                box=box,
-                position_desc=pos_desc,
-                proximity_desc=prox_desc
+            DetectionResult(
+                label=d["label"],
+                label_en=d["label_en"],
+                score=d["score"],
+                box=BoundingBox(x1=x1_norm, y1=y1_norm, x2=x2_norm, y2=y2_norm),
+                box_pixels=BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2)
             )
         )
 
-    return DetectionResponse(detections=detections, total_detections=len(detections))
+    processing_time = (time.time() - start_time) * 1000
+    
+    mode_info = MODES[mode]
+
+    return DetectionResponse(
+        success=True,
+        mode=mode,
+        mode_name=mode_info['turkish_name'],
+        detections=detections,
+        image_width=width,
+        image_height=height,
+        processing_time_ms=processing_time
+    )
 
 if __name__ == "__main__":
     import uvicorn

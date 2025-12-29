@@ -14,8 +14,8 @@ import retrofit2.HttpException
 class DetectionRepositoryImpl(
     private val api: ApiService
 ) : DetectionRepository {
-    override suspend fun detectObjects(image: String): Either<AppError, DetectionResult> = try {
-        val resp = api.detect(ImageUploadRequest(image = image))
+    override suspend fun detectObjects(image: String, mode: String): Either<AppError, DetectionResult> = try {
+        val resp = api.detect(com.example.visionguide.data.network.DetectionRequest(image = image, mode = mode))
         Either.Right(resp.toDomain())
     } catch (t: Throwable) {
         val err = when (t) {

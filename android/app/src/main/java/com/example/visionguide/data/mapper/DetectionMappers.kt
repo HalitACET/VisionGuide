@@ -7,26 +7,21 @@ import com.example.visionguide.domain.model.DetectionBox
 import com.example.visionguide.domain.model.DetectionResult
 
 fun DetectionItem.toDomain(): Detection {
-    val bx = box
-    val boxDomain = if (bx.size >= 4) {
-        DetectionBox(
-            x1 = bx[0],
-            y1 = bx[1],
-            x2 = bx[2],
-            y2 = bx[3]
-        )
-    } else {
-        DetectionBox(0f, 0f, 0f, 0f)
-    }
     return Detection(
         label = label,
+        labelEn = label_en,
         score = score,
-        box = boxDomain
+        box = DetectionBox(box.x1, box.y1, box.x2, box.y2)
     )
 }
 
 fun DetectionResponse.toDomain(): DetectionResult =
-    DetectionResult(detections = detections.map { it.toDomain() })
+    DetectionResult(
+        detections = detections.map { it.toDomain() },
+        mode = mode,
+        modeName = mode_name,
+        success = success
+    )
 
 fun com.example.visionguide.data.network.SegmentItem.toDomain(): com.example.visionguide.domain.model.Segment =
     com.example.visionguide.domain.model.Segment(

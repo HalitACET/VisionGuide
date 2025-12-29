@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
@@ -228,6 +231,36 @@ fun ObjectDetectionScreen(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+
+        // Mode Selector
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 64.dp)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val modes = listOf("E" to "Ev", "S" to "Sokak", "M" to "Market")
+            modes.forEach { (code, name) ->
+                val isSelected = state.mode == code
+                val containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White
+                
+                androidx.compose.material3.TextButton(
+                    onClick = { viewModel.setMode(code) },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        containerColor = containerColor,
+                        contentColor = contentColor
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text(text = name, style = MaterialTheme.typography.labelLarge, fontWeight = if(isSelected) FontWeight.Bold else FontWeight.Normal)
+                }
+            }
+        }
 
         // Loading Overlay
         if (state.isLoading) {

@@ -9,12 +9,16 @@ data class DetectionBox(
 
 data class Detection(
     val label: String,
+    val labelEn: String,
     val score: Float,
     val box: DetectionBox
 )
 
 data class DetectionResult(
-    val detections: List<Detection>
+    val detections: List<Detection>,
+    val mode: String,
+    val modeName: String,
+    val success: Boolean
 )
 
 data class Segment(
