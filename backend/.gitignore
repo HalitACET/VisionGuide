@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Veritabanı dosyaları
+*.db
+visionguide
+
+# Model dosyaları (YOLO vb.)
+*.pt
+
+# Ortam dosyaları
+.env
+.env.*
+!.env.example
+
+# IDE / editör
+.vscode/
+.idea/
+*.iml
+
+# Log dosyaları
+*.log

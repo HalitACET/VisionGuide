@@ -1,0 +1,41 @@
+package com.example.visionguide.di
+
+import com.example.visionguide.domain.repository.DetectionRepository
+import com.example.visionguide.data.repository.DetectionRepositoryImpl
+import com.example.visionguide.domain.usecase.AnalyzeImageUseCase
+import com.example.visionguide.data.network.ApiClient
+import com.example.visionguide.data.network.ApiService
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DetectionModule {
+
+    @Provides
+    @Singleton
+    fun provideApiService(): ApiService = ApiClient.api
+
+    @Provides
+    @Singleton
+    fun provideRepository(api: ApiService): DetectionRepository = DetectionRepositoryImpl(api)
+
+    @Provides
+    @Singleton
+    fun provideAnalyzeImageUseCase(repo: DetectionRepository): AnalyzeImageUseCase = AnalyzeImageUseCase(repo)
+
+    @Provides
+    @Singleton
+    fun provideReadTextUseCase(repo: DetectionRepository): com.example.visionguide.domain.usecase.ReadTextUseCase = com.example.visionguide.domain.usecase.ReadTextUseCase(repo)
+
+    @Provides
+    @Singleton
+    fun provideAnalyzeUseCase(repo: DetectionRepository): com.example.visionguide.domain.usecase.AnalyzeUseCase = com.example.visionguide.domain.usecase.AnalyzeUseCase(repo)
+
+    @Provides
+    @Singleton
+    fun provideSegmentObjectsUseCase(repo: DetectionRepository): com.example.visionguide.domain.usecase.SegmentObjectsUseCase = com.example.visionguide.domain.usecase.SegmentObjectsUseCase(repo)
+}
